@@ -35,7 +35,7 @@ public:
 
     void clear();
 
-    void render(const hittable& world);
+    void render(const hittable* pWorld);
 
     void set_bitmapDC(BitmapBuffer* pBitmapBuffer);
 

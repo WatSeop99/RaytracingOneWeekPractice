@@ -17,7 +17,8 @@ void camera::init(hittable_list* pWorld)
         __debugbreak();
     }
 
-    m_TotalThreadCount = physicalCoreCount;
+    //m_TotalThreadCount = physicalCoreCount / 2;
+    m_TotalThreadCount = 2;
 
     m_pThreadParams = new ThreadParam[m_TotalThreadCount];
     if (!m_pThreadParams)
@@ -94,9 +95,10 @@ void camera::clear()
     }
 }
 
-void camera::render(const hittable& world)
+void camera::render(const hittable* pWorld)
 {
     _ASSERT(m_pBitmapBuffer);
+    _ASSERT(pWorld);
 
     initialize();
 

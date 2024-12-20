@@ -217,6 +217,11 @@ UINT WINAPI ThreadFunc(void* pArg)
 				}
 
 				InterlockedDecrement(&pCamera->Completed);
+				{
+					WCHAR szDebugString[MAX_PATH];
+					swprintf_s(szDebugString, MAX_PATH, L"Thread %d work done.\n", threadNo);
+					OutputDebugString(szDebugString);
+				}
 				if (pCamera->Completed == 0)
 				{
 					SetEvent(*phCompleted);
@@ -243,7 +248,7 @@ ray GetRay(int i, int j, camera* pCamera)
 	_ASSERT(pCamera);
 
 	int image_height = (int)(pCamera->image_width / pCamera->aspect_ratio);
-	image_height = ((image_height < 1) ? 1 : image_height);
+	image_height = (image_height < 1 ? 1 : image_height);
 
 	point3 center = pCamera->lookfrom;
 

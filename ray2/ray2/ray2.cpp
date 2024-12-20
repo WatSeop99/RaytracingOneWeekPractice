@@ -17,7 +17,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 camera* g_pCam = nullptr;
 BitmapBuffer* g_pBitmapBuffer = nullptr;
-hittable_list g_World;
+hittable_list* g_pWorld = nullptr;
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -48,8 +48,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
 
     {
+        g_pWorld = new hittable_list;
+        if (!g_pWorld)
+        {
+            __debugbreak();
+        }
+
         shared_ptr<lambertian> ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
-        g_World.add(make_shared<sphere>(point3(0, -1000, 0), 1000, ground_material));
+        g_pWorld->add(make_shared<sphere>(point3(0, -1000, 0), 1000, ground_material));
 
         for (int a = -11; a < 11; a++)
         {
@@ -67,7 +73,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                         // diffuse
                         vec3 albedo = color::random() * color::random();
                         sphere_material = make_shared<lambertian>(albedo);
-                        g_World.add(make_shared<sphere>(center, 0.2, sphere_material));
+                        g_pWorld->add(make_shared<sphere>(center, 0.2, sphere_material));
                     }
                     else if (choose_mat < 0.95)
                     {
@@ -75,28 +81,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                         vec3 albedo = color::random(0.5, 1);
                         double fuzz = random_double(0, 0.5);
                         sphere_material = make_shared<metal>(albedo, fuzz);
-                        g_World.add(make_shared<sphere>(center, 0.2, sphere_material));
+                        g_pWorld->add(make_shared<sphere>(center, 0.2, sphere_material));
                     }
                     else
                     {
                         // glass
                         sphere_material = make_shared<dielectric>(1.5);
-                        g_World.add(make_shared<sphere>(center, 0.2, sphere_material));
+                        g_pWorld->add(make_shared<sphere>(center, 0.2, sphere_material));
                     }
                 }
             }
         }
 
         shared_ptr<dielectric> material1 = make_shared<dielectric>(1.5);
-        g_World.add(make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
+        g_pWorld->add(make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
 
         shared_ptr<lambertian> material2 = make_shared<lambertian>(color(0.4, 0.2, 0.1));
-        g_World.add(make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
+        g_pWorld->add(make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
 
         shared_ptr<metal> material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
-        g_World.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
+        g_pWorld->add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
     
-        g_pCam->init(&g_World);
+        g_pCam->init(g_pWorld);
     }
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_RAY2));
@@ -105,7 +111,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // Main message loop:
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        g_pCam->render(g_World);
+        g_pCam->render(g_pWorld);
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
             TranslateMessage(&msg);
