@@ -45,9 +45,9 @@ public:
         int yInteger = int(std::floor(inv_scale * p.y()));
         int zInteger = int(std::floor(inv_scale * p.z()));
 
-        bool isEven = (xInteger + yInteger + zInteger) % 2 == 0;
+        bool isEven = ((xInteger + yInteger + zInteger) % 2 == 0);
 
-        return isEven ? even->value(u, v, p) : odd->value(u, v, p);
+        return (isEven ? even->value(u, v, p) : odd->value(u, v, p));
     }
 
 private:

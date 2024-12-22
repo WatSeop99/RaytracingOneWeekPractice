@@ -17,8 +17,8 @@ void camera::init(hittable_list* pWorld)
         __debugbreak();
     }
 
-    //m_TotalThreadCount = physicalCoreCount / 2;
-    m_TotalThreadCount = 2;
+    m_TotalThreadCount = physicalCoreCount;
+    //m_TotalThreadCount = 2;
 
     m_pThreadParams = new ThreadParam[m_TotalThreadCount];
     if (!m_pThreadParams)

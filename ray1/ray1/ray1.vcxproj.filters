@@ -68,5 +68,11 @@
     <ClInclude Include="perlin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="quad.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="constant_medium.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
