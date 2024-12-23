@@ -64,7 +64,10 @@ public:
     color value(double u, double v, const point3& p) const override
     {
         // If we have no texture data, then return solid cyan as a debugging aid.
-        if (image.height() <= 0) return color(0, 1, 1);
+        if (image.height() <= 0)
+        {
+            return color(0, 1, 1);
+        }
 
         // Clamp input texture coordinates to [0,1] x [1,0]
         u = interval(0, 1).clamp(u);

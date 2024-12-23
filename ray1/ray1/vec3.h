@@ -177,4 +177,29 @@ inline vec3 refract(const vec3& uv, const vec3& n, double etai_over_etat)
 	return r_out_perp + r_out_parallel;
 }
 
+inline vec3 random_in_unit_sphere()
+{
+	while (true)
+	{
+		vec3 p = vec3::random(-1, 1);
+		if (p.length_squared() < 1)
+		{
+			return p;
+		}
+	}
+}
+
+inline vec3 random_cosine_direction()
+{
+	double r1 = random_double();
+	double r2 = random_double();
+
+	double phi = 2 * pi * r1;
+	double x = std::cos(phi) * std::sqrt(r2);
+	double y = std::sin(phi) * std::sqrt(r2);
+	double z = std::sqrt(1 - r2);
+
+	return vec3(x, y, z);
+}
+
 #endif
