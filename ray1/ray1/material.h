@@ -2,8 +2,17 @@
 #define MATERIAL_H
 
 #include "hittable.h"
-#include "onb.h"
+#include "pdf.h"
 #include "texture.h"
+
+class scatter_record
+{
+public:
+    color attenuation;
+    shared_ptr<pdf> pdf_ptr;
+    bool skip_pdf;
+    ray skip_pdf_ray;
+};
 
 class material
 {
@@ -15,7 +24,7 @@ public:
         return color(0, 0, 0);
     }
 
-	virtual bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, double& pdf) const
+	virtual bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const
 	{
 		return false;
 	}
@@ -32,20 +41,18 @@ public:
     lambertian(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
     lambertian(shared_ptr<texture> tex) : tex(tex) {}
 
-    bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, double& pdf) const override
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override
     {
-        onb uvw(rec.normal);
-        auto scatter_direction = uvw.transform(random_cosine_direction());
-
-        scattered = ray(rec.p, unit_vector(scatter_direction), r_in.time());
-        attenuation = tex->value(rec.u, rec.v, rec.p);
-        pdf = dot(uvw.w(), scattered.direction()) / pi;
+        srec.attenuation = tex->value(rec.u, rec.v, rec.p);
+        srec.pdf_ptr = make_shared<cosine_pdf>(rec.normal);
+        srec.skip_pdf = false;
         return true;
     }
 
     double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const override
     {
-        return 1 / (2 * pi);
+        double cos_theta = dot(rec.normal, unit_vector(scattered.direction()));
+        return (cos_theta < 0 ? 0 : cos_theta / pi);
     }
 
 private:
@@ -60,13 +67,17 @@ public:
         fuzz(fuzz < 1 ? fuzz : 1) 
     { }
 
-    bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, double& pdf) const override
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override
     {
         vec3 reflected = reflect(r_in.direction(), rec.normal);
         reflected = unit_vector(reflected) + (fuzz * random_unit_vector());
-        scattered = ray(rec.p, reflected, r_in.time());
-        attenuation = albedo;
-        return (dot(scattered.direction(), rec.normal) > 0);
+        
+        srec.attenuation = albedo;
+        srec.pdf_ptr = nullptr;
+        srec.skip_pdf = true;
+        srec.skip_pdf_ray = ray(rec.p, reflected, r_in.time());
+
+        return true;
     }
 
 private:
@@ -79,9 +90,11 @@ class dielectric : public material
 public:
     dielectric(double refraction_index) : refraction_index(refraction_index) {}
 
-    bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, double& pdf) const override
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override
     {
-        attenuation = color(1.0, 1.0, 1.0);
+        srec.attenuation = color(1.0, 1.0, 1.0);
+        srec.pdf_ptr = nullptr;
+        srec.skip_pdf = true;
         double ri = (rec.front_face ? (1.0 / refraction_index) : refraction_index);
 
         vec3 unit_direction = unit_vector(r_in.direction());
@@ -100,7 +113,7 @@ public:
             direction = refract(unit_direction, rec.normal, ri);
         }
 
-        scattered = ray(rec.p, direction, r_in.time());
+        srec.skip_pdf_ray = ray(rec.p, direction, r_in.time());
         return true;
     }
 
@@ -143,11 +156,11 @@ public:
     isotropic(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}
     isotropic(shared_ptr<texture> tex) : tex(tex) {}
 
-    bool scatter(const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered, double& pdf) const override
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec) const override
     {
-        scattered = ray(rec.p, random_unit_vector(), r_in.time());
-        attenuation = tex->value(rec.u, rec.v, rec.p);
-        pdf = 1 / (4 * pi);
+        srec.attenuation = tex->value(rec.u, rec.v, rec.p);
+        srec.pdf_ptr = make_shared<sphere_pdf>();
+        srec.skip_pdf = false;
         return true;
     }
 
