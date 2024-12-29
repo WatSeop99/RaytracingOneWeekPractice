@@ -14,6 +14,7 @@
 #include "d3dx12.h"
 #include <dxgi1_4.h>
 #include <dxgiformat.h>
+#include <DirectXMath.h>
 
 // C RunTime Header Files
 #include <stdio.h>

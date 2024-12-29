@@ -13,6 +13,12 @@ struct HeapData
 	ID3D12DescriptorHeap* pHeap;
 	UINT UsedEntries;
 };
+struct AccelerationStructureBuffers
+{
+	ID3D12Resource* pScratch;
+	ID3D12Resource* pResult;
+	ID3D12Resource* pInstanceDesc;    // Used only for top-level AS
+};
 
 class Application final : public BaseForm
 {
@@ -45,6 +51,15 @@ private:
 	IDXGISwapChain3* CreateSwapChain(IDXGIFactory4* pFactory, HWND hwnd, UINT width, UINT height, DXGI_FORMAT format, ID3D12CommandQueue* pCommandQueue);
 	ID3D12DescriptorHeap* CreateDescriptorHeap(ID3D12Device5* pDevice, UINT count, D3D12_DESCRIPTOR_HEAP_TYPE type, bool bShaderVisible);
 	D3D12_CPU_DESCRIPTOR_HANDLE CreateRTV(ID3D12Device5* pDevice, ID3D12Resource* pResource, ID3D12DescriptorHeap* pHeap, UINT* outUsedHeapEntries, DXGI_FORMAT format);
+
+	ID3D12Resource* CreateTriangleVB(ID3D12Device5* pDevice);
+	AccelerationStructureBuffers CreateBottomLevelAS(ID3D12Device5* pDevice, ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pVertexBuffer);
+	AccelerationStructureBuffers CreateTopLevelAS(ID3D12Device5* pDevice, ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pBottomLevelAS, UINT64* pTlasSize);
+	ID3D12Resource* CreateBuffer(ID3D12Device5* pDevice, UINT64 size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps);
+
+	DxilLibrary CreateDXILLibrary();
+
+	UINT64 SubmitCommandList(ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, ID3D12Fence* pFence, UINT64 fenceValue);
 
 private:
 	ID3D12Device5* m_pDevice = nullptr;

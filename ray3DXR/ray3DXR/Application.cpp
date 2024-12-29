@@ -148,11 +148,99 @@ void Application::EndFrame()
 
 void Application::CreateAccelerationStructures()
 {
+	m_pVertexBuffer = CreateTriangleVB(m_pDevice);
+	if (!m_pVertexBuffer)
+	{
+		__debugbreak();
+	}
 
+	AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(m_pDevice, m_pCommandList, m_pVertexBuffer);
+	AccelerationStructureBuffers topLevelBuffers = CreateTopLevelAS(m_pDevice, m_pCommandList, bottomLevelBuffers.pResult, &m_TlasSize);
+
+	// The tutorial doesn't have any resource lifetime management, so we flush and sync here. This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
+	m_FenceValue = SubmitCommandList(m_pCommandList, m_pCommandQueue, m_pFence, m_FenceValue);
+	m_pFence->SetEventOnCompletion(m_FenceValue, m_hFenceEvent);
+	WaitForSingleObject(m_hFenceEvent, INFINITE);
+
+	UINT bufferIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+	m_pCommandList->Reset(m_FrameObjects[0].pCommandAllocator, nullptr);
+
+	// Store the AS buffers. The rest of the buffers will be released once we exit the function
+	m_pTopLevelAS = topLevelBuffers.pResult;
+	m_pBottomLevelAS = bottomLevelBuffers.pResult;
 }
 
 void Application::CreateRTPipelineState()
-{}
+{
+	// Need 10 subobjects:
+	//  1 for the DXIL library
+	//  1 for hit-group
+	//  2 for RayGen root-signature (root-signature and the subobject association)
+	//  2 for the root-signature shared between miss and hit shaders (signature and association)
+	//  2 for shader config (shared between all programs. 1 for the config, 1 for association)
+	//  1 for pipeline config
+	//  1 for the global root signature
+
+	D3D12_STATE_SUBOBJECT subObjects[10] = {};
+	UINT index = 0;
+	HRESULT hr;
+
+	// Create the DXIL library
+	DxilLibrary dxilLib = CreateDxilLibrary();
+	subobjects[index++] = dxilLib.stateSubobject; // 0 Library
+
+	HitProgram hitProgram(nullptr, kClosestHitShader, kHitGroup);
+	subobjects[index++] = hitProgram.subObject; // 1 Hit Group
+
+	// Create the ray-gen root-signature and association
+	LocalRootSignature rgsRootSignature(mpDevice, createRayGenRootDesc().desc);
+	subobjects[index] = rgsRootSignature.subobject; // 2 RayGen Root Sig
+
+	UINT rgsRootIndex = index++; // 2
+	ExportAssociation rgsRootAssociation(&kRayGenShader, 1, &(subobjects[rgsRootIndex]));
+	subobjects[index++] = rgsRootAssociation.subobject; // 3 Associate Root Sig to RGS
+
+	// Create the miss- and hit-programs root-signature and association
+	D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
+	emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	LocalRootSignature hitMissRootSignature(mpDevice, emptyDesc);
+	subobjects[index] = hitMissRootSignature.subobject; // 4 Root Sig to be shared between Miss and CHS
+
+	UINT hitMissRootIndex = index++; // 4
+	const WCHAR* missHitExportName[] = { kMissShader, kClosestHitShader };
+	ExportAssociation missHitRootAssociation(missHitExportName, arraysize(missHitExportName), &(subobjects[hitMissRootIndex]));
+	subobjects[index++] = missHitRootAssociation.subobject; // 5 Associate Root Sig to Miss and CHS
+
+	// Bind the payload size to the programs
+	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 3);
+	subobjects[index] = shaderConfig.subobject; // 6 Shader Config
+
+	UINT shaderConfigIndex = index++; // 6
+	const WCHAR* shaderExports[] = { kMissShader, kClosestHitShader, kRayGenShader };
+	ExportAssociation configAssociation(shaderExports, arraysize(shaderExports), &(subobjects[shaderConfigIndex]));
+	subobjects[index++] = configAssociation.subobject; // 7 Associate Shader Config to Miss, CHS, RGS
+
+	// Create the pipeline config
+	PipelineConfig config(1);
+	subobjects[index++] = config.subobject; // 8
+
+	// Create the global root signature and store the empty signature
+	GlobalRootSignature root(mpDevice, {});
+	m_pEmptyRootSignature = root.pRootSig;
+	subobjects[index++] = root.subobject; // 9
+
+	// Create the state
+	D3D12_STATE_OBJECT_DESC desc = {};
+	desc.NumSubobjects = index; // 10
+	desc.pSubobjects = subobjects.data();
+	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+
+	hr = m_pDevice->CreateStateObject(&desc, IID_PPV_ARGS(&m_pPipelineState));
+	if (FAILED(hr))
+	{
+		__debugbreak();
+	}
+}
 
 void Application::CreateShaderTable()
 {}
@@ -289,4 +377,184 @@ D3D12_CPU_DESCRIPTOR_HANDLE Application::CreateRTV(ID3D12Device5* pDevice, ID3D1
 
 	pDevice->CreateRenderTargetView(pResource, &desc, rtvHandle);
 	return rtvHandle;
+}
+
+ID3D12Resource* Application::CreateTriangleVB(ID3D12Device5* pDevice)
+{
+	_ASSERT(pDevice);
+
+	const DirectX::XMFLOAT3 VERTICES[] =
+	{
+		DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f),
+		DirectX::XMFLOAT3(0.866f,  -0.5f, 0.0f),
+		DirectX::XMFLOAT3(-0.866f, -0.5f, 0.0f)
+	};
+
+	CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD, 0, 0);
+	ID3D12Resource* pBuffer = CreateBuffer(pDevice, sizeof(VERTICES), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeapProps);
+	if (!pBuffer)
+	{
+		__debugbreak();
+		return nullptr;
+	}
+	
+	UINT8* pData = nullptr;
+	pBuffer->Map(0, nullptr, (void**)&pData);
+	memcpy(pData, VERTICES, sizeof(VERTICES));
+	pBuffer->Unmap(0, nullptr);
+
+	return pBuffer;
+}
+
+AccelerationStructureBuffers Application::CreateBottomLevelAS(ID3D12Device5* pDevice, ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pVertexBuffer)
+{
+	_ASSERT(pDevice);
+	_ASSERT(pCommandList);
+	_ASSERT(pVertexBuffer);
+
+	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc = {};
+	geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	geomDesc.Triangles.VertexBuffer.StartAddress = pVertexBuffer->GetGPUVirtualAddress();
+	geomDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(DirectX::XMFLOAT3);
+	geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	geomDesc.Triangles.VertexCount = 3;
+	geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+
+	// Get the size requirements for the scratch and AS buffers
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	inputs.NumDescs = 1;
+	inputs.pGeometryDescs = &geomDesc;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info = {};
+	pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+
+	// Create the buffers. They need to support UAV, and since we are going to immediately use them, we create them with an unordered-access state
+	CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT, 0, 0);
+	AccelerationStructureBuffers buffers = { 0, };
+	buffers.pScratch = CreateBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, defaultHeapProps);
+	buffers.pResult = CreateBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeapProps);
+
+	// Create the bottom-level AS
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+	asDesc.Inputs = inputs;
+	asDesc.DestAccelerationStructureData = buffers.pResult->GetGPUVirtualAddress();
+	asDesc.ScratchAccelerationStructureData = buffers.pScratch->GetGPUVirtualAddress();
+
+	pCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+
+	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
+	D3D12_RESOURCE_BARRIER uavBarrier = {};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = buffers.pResult;
+	pCommandList->ResourceBarrier(1, &uavBarrier);
+
+	return buffers;
+}
+
+AccelerationStructureBuffers Application::CreateTopLevelAS(ID3D12Device5* pDevice, ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pBottomLevelAS, UINT64* pTlasSize)
+{
+	_ASSERT(pDevice);
+	_ASSERT(pCommandList);
+	_ASSERT(pBottomLevelAS);
+	_ASSERT(pTlasSize);
+
+	// First, get the size of the TLAS buffers and create them
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+	inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
+	inputs.NumDescs = 1;
+	inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+	pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+
+	// Create the buffers
+	CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT, 0, 0);
+	AccelerationStructureBuffers buffers = { 0, };
+	buffers.pScratch = CreateBuffer(pDevice, info.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, defaultHeapProps);
+	buffers.pResult = CreateBuffer(pDevice, info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeapProps);
+	*pTlasSize = info.ResultDataMaxSizeInBytes;
+
+	// The instance desc should be inside a buffer, create and map the buffer
+	CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD, 0, 0);
+	buffers.pInstanceDesc = CreateBuffer(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeapProps);
+	D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDesc = nullptr;
+	buffers.pInstanceDesc->Map(0, nullptr, (void**)&pInstanceDesc);
+
+	// Initialize the instance desc. We only have a single instance
+	pInstanceDesc->InstanceID = 0;                            // This value will be exposed to the shader via InstanceID()
+	pInstanceDesc->InstanceContributionToHitGroupIndex = 0;   // This is the offset inside the shader-table. We only have a single geometry, so the offset 0
+	pInstanceDesc->Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
+	// Identity matrix
+	DirectX::XMFLOAT4X4 matrix = 
+	{
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
+	memcpy(pInstanceDesc->Transform, &matrix, sizeof(pInstanceDesc->Transform));
+	pInstanceDesc->AccelerationStructure = pBottomLevelAS->GetGPUVirtualAddress();
+	pInstanceDesc->InstanceMask = 0xFF;
+
+	// Unmap
+	buffers.pInstanceDesc->Unmap(0, nullptr);
+
+	// Create the TLAS
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+	asDesc.Inputs = inputs;
+	asDesc.Inputs.InstanceDescs = buffers.pInstanceDesc->GetGPUVirtualAddress();
+	asDesc.DestAccelerationStructureData = buffers.pResult->GetGPUVirtualAddress();
+	asDesc.ScratchAccelerationStructureData = buffers.pScratch->GetGPUVirtualAddress();
+
+	pCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+
+	// We need to insert a UAV barrier before using the acceleration structures in a raytracing operation
+	D3D12_RESOURCE_BARRIER uavBarrier = {};
+	uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarrier.UAV.pResource = buffers.pResult;
+	pCommandList->ResourceBarrier(1, &uavBarrier);
+
+	return buffers;
+}
+
+ID3D12Resource* Application::CreateBuffer(ID3D12Device5* pDevice, UINT64 size, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initState, const D3D12_HEAP_PROPERTIES& heapProps)
+{
+	_ASSERT(pDevice);
+
+	D3D12_RESOURCE_DESC bufDesc = {};
+	bufDesc.Alignment = 0;
+	bufDesc.DepthOrArraySize = 1;
+	bufDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	bufDesc.Flags = flags;
+	bufDesc.Format = DXGI_FORMAT_UNKNOWN;
+	bufDesc.Height = 1;
+	bufDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	bufDesc.MipLevels = 1;
+	bufDesc.SampleDesc.Count = 1;
+	bufDesc.SampleDesc.Quality = 0;
+	bufDesc.Width = size;
+
+	ID3D12Resource* pBuffer = nullptr;
+	pDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufDesc, initState, nullptr, IID_PPV_ARGS(&pBuffer));
+	return pBuffer;
+}
+
+UINT64 Application::SubmitCommandList(ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, ID3D12Fence* pFence, UINT64 fenceValue)
+{
+	_ASSERT(pCommandList);
+	_ASSERT(pCommandQueue);
+	_ASSERT(pFence);
+
+	pCommandList->Close();
+
+	ID3D12CommandList* ppCommandLists[] = { pCommandList, };
+	pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+	++fenceValue;
+	pCommandQueue->Signal(pFence, fenceValue);
+	return fenceValue;
 }
