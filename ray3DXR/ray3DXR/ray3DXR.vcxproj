@@ -130,6 +130,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="BaseForm.h" />
     <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="DxcDLLSupport.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ray3DXR.h" />
     <ClInclude Include="Resource.h" />
@@ -138,6 +139,7 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="BaseForm.cpp" />
+    <ClCompile Include="DxcDLLSupport.cpp" />
     <ClCompile Include="ray3DXR.cpp" />
   </ItemGroup>
   <ItemGroup>

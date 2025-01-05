@@ -1,5 +1,7 @@
 #pragma once
 
+#define ALIGN_TO(_alignment, _val) (((_val + _alignment - 1) / _alignment) * _alignment)
+
 class BaseForm
 {
 public:

@@ -12,6 +12,7 @@
 // DXR Header Files
 #include <d3d12.h>
 #include "d3dx12.h"
+#include <dxcapi.h>
 #include <dxgi1_4.h>
 #include <dxgiformat.h>
 #include <DirectXMath.h>
@@ -24,3 +25,7 @@
 #include <tchar.h>
 #include <math.h>
 #include <crtdbg.h>
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
