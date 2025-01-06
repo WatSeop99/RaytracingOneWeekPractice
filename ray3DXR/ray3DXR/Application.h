@@ -99,34 +99,6 @@ struct ExportAssociation
 	D3D12_STATE_SUBOBJECT SubObject;
 	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION Association;
 };
-struct LocalRootSignature
-{
-	LocalRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
-	{
-		pRootSig = CreateRootSignature(pDevice, DESC);
-		pInterface = pRootSig;
-		SubObject.pDesc = &pInterface;
-		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-	}
-
-	ID3D12RootSignature* pRootSig;
-	ID3D12RootSignature* pInterface;
-	D3D12_STATE_SUBOBJECT SubObject;
-};
-struct GlobalRootSignature
-{
-	GlobalRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
-	{
-		pRootSig = CreateRootSignature(pDevice, DESC);
-		pInterface = pRootSig;
-		SubObject.pDesc = &pInterface;
-		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-	}
-
-	ID3D12RootSignature* pRootSig;
-	ID3D12RootSignature* pInterface;
-	D3D12_STATE_SUBOBJECT SubObject;
-};
 struct ShaderConfig
 {
 	ShaderConfig(UINT maxAttributeSizeInBytes, UINT maxPayloadSizeInBytes)

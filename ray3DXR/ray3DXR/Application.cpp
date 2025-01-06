@@ -2,6 +2,75 @@
 #include "DxcDLLSupport.h"
 #include "Application.h"
 
+struct LocalRootSignature
+{
+	LocalRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
+	{
+		pRootSig = CreateRootSignature(pDevice, DESC);
+		pInterface = pRootSig;
+		SubObject.pDesc = &pInterface;
+		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+	}
+	ID3D12RootSignature* CreateRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
+	{
+		_ASSERT(pDevice);
+
+		ID3DBlob* pSigBlob = nullptr;
+		ID3DBlob* pErrorBlob = nullptr;
+
+		HRESULT hr = D3D12SerializeRootSignature(&DESC, D3D_ROOT_SIGNATURE_VERSION_1, &pSigBlob, &pErrorBlob);
+		if (FAILED(hr))
+		{
+			pErrorBlob->Release();
+			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			return nullptr;
+		}
+
+		ID3D12RootSignature* pRootSig = nullptr;
+		pDevice->CreateRootSignature(0, pSigBlob->GetBufferPointer(), pSigBlob->GetBufferSize(), IID_PPV_ARGS(&pRootSig));
+		pSigBlob->Release();
+		return pRootSig;
+	}
+
+	ID3D12RootSignature* pRootSig;
+	ID3D12RootSignature* pInterface;
+	D3D12_STATE_SUBOBJECT SubObject;
+};
+struct GlobalRootSignature
+{
+	GlobalRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
+	{
+		pRootSig = CreateRootSignature(pDevice, DESC);
+		pInterface = pRootSig;
+		SubObject.pDesc = &pInterface;
+		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+	}
+	ID3D12RootSignature* CreateRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
+	{
+		_ASSERT(pDevice);
+
+		ID3DBlob* pSigBlob = nullptr;
+		ID3DBlob* pErrorBlob = nullptr;
+
+		HRESULT hr = D3D12SerializeRootSignature(&DESC, D3D_ROOT_SIGNATURE_VERSION_1, &pSigBlob, &pErrorBlob);
+		if (FAILED(hr))
+		{
+			pErrorBlob->Release();
+			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			return nullptr;
+		}
+
+		ID3D12RootSignature* pRootSig = nullptr;
+		pDevice->CreateRootSignature(0, pSigBlob->GetBufferPointer(), pSigBlob->GetBufferSize(), IID_PPV_ARGS(&pRootSig));
+		pSigBlob->Release();
+		return pRootSig;
+	}
+
+	ID3D12RootSignature* pRootSig;
+	ID3D12RootSignature* pInterface;
+	D3D12_STATE_SUBOBJECT SubObject;
+};
+
 Application::~Application()
 {}
 
@@ -144,6 +213,9 @@ void Application::InitDXR()
 
 UINT Application::BeginFrame()
 {
+	_ASSERT(m_pCBVSRVUAVHeap);
+	_ASSERT(m_pCommandList);
+
 	ID3D12DescriptorHeap* ppHeaps[] = { m_pCBVSRVUAVHeap };
 	m_pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
