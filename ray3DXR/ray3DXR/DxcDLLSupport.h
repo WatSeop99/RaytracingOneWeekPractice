@@ -1,7 +1,7 @@
 #pragma once
 
 typedef HRESULT(__stdcall* DxcCreateInstanceProc)(REFCLSID rclsid, REFIID riid, LPVOID* ppv);
-typedef HRSEULT(__stdcall* DxcCreateInstance2Proc)(IMalloc* pMalloc, REFCLSID rclsid, REFIID riid, LPVOID* ppv);
+typedef HRESULT(__stdcall* DxcCreateInstance2Proc)(IMalloc* pMalloc, REFCLSID rclsid, REFIID riid, LPVOID* ppv);
 
 class DxcDLLSupport
 {

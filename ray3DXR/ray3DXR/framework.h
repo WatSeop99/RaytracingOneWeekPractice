@@ -10,6 +10,8 @@
 #include <Windows.h>
 
 // DXR Header Files
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
 #include <d3d12.h>
 #include "d3dx12.h"
 #include <dxcapi.h>
@@ -29,3 +31,4 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <array>

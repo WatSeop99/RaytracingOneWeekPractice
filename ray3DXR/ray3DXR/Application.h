@@ -29,6 +29,8 @@ struct DXILLibrary
 {
 	DXILLibrary(ID3DBlob* pBlob, const WCHAR* pszENTRY_POINT[], UINT entryPointCount) : pShaderBlob(pBlob)
 	{
+		_ASSERT(pszENTRY_POINT);
+
 		StateSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
 		StateSubObject.pDesc = &DXILLibDesc;
 
@@ -52,14 +54,14 @@ struct DXILLibrary
 		}
 	}
 	DXILLibrary() : DXILLibrary(nullptr, nullptr, 0) {}
-	/*~DXILLibrary()
+	~DXILLibrary()
 	{
 		if (pShaderBlob)
 		{
 			pShaderBlob->Release();
 			pShaderBlob = nullptr;
 		}
-	}*/
+	}
 
 	D3D12_DXIL_LIBRARY_DESC DXILLibDesc;
 	D3D12_STATE_SUBOBJECT StateSubObject;

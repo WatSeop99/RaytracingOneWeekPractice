@@ -1,7 +1,7 @@
 RaytracingAccelerationStructure g_RtScene : register(t0);
 RWTexture2D<float4> g_Output : register(u0);
 
-float LinearToSRGB(float3 c)
+float3 LinearToSRGB(float3 c)
 {
     float3 sq1 = sqrt(c);
     float3 sq2 = sqrt(sq1);
@@ -29,7 +29,7 @@ void RayGen()
 
     RayDesc ray;
     ray.Origin = float3(0, 0, -2);
-    ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1));
+    ray.Direction = normalize(float3(d.x * aspectRatio, -d.y, 1.0f));
 
     ray.TMin = 0;
     ray.TMax = 100000;
@@ -37,10 +37,10 @@ void RayGen()
     RayPayload payload;
     TraceRay(g_RtScene, 0 /*rayFlags*/, 0xFF, 0 /* ray index*/, 0, 0, ray, payload);
     float3 col = LinearToSRGB(payload.Color);
-    g_Output[launchIndex.xy] = float4(col, 1);
+    g_Output[launchIndex.xy] = float4(col, 1.0f);
 }
 
-[GeometryShader("miss")]
+[shader("miss")]
 void Miss(inout RayPayload payload)
 {
     payload.Color = float3(0.4f, 0.6f, 0.2f);

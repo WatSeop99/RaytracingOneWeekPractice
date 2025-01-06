@@ -11,6 +11,15 @@ struct LocalRootSignature
 		SubObject.pDesc = &pInterface;
 		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 	}
+	~LocalRootSignature()
+	{
+		if (pRootSig)
+		{
+			pRootSig->Release();
+			pRootSig = nullptr;
+			pInterface = nullptr;
+		}
+	}
 	ID3D12RootSignature* CreateRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
 	{
 		_ASSERT(pDevice);
@@ -45,6 +54,15 @@ struct GlobalRootSignature
 		SubObject.pDesc = &pInterface;
 		SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
 	}
+	/*~GlobalRootSignature()
+	{
+		if (pRootSig)
+		{
+			pRootSig->Release();
+			pRootSig = nullptr;
+			pRootSig = nullptr;
+		}
+	}*/
 	ID3D12RootSignature* CreateRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC)
 	{
 		_ASSERT(pDevice);
@@ -70,6 +88,8 @@ struct GlobalRootSignature
 	ID3D12RootSignature* pInterface;
 	D3D12_STATE_SUBOBJECT SubObject;
 };
+
+DxcDLLSupport g_DxcDllHelper;
 
 Application::~Application()
 {}
@@ -132,6 +152,33 @@ void Application::OnShutdown()
 	m_pCommandQueue->Signal(m_pFence, m_FenceValue);
 	m_pFence->SetEventOnCompletion(m_FenceValue, m_hFenceEvent);
 	WaitForSingleObject(m_hFenceEvent, INFINITE);
+
+	m_pCBVSRVUAVHeap->Release();
+	m_pOutputResource->Release();
+
+	m_pShaderTable->Release();
+
+	m_pEmptyRootSignature->Release();
+	m_pPipelineState->Release();
+
+	m_pBottomLevelAS->Release();
+	m_pTopLevelAS->Release();
+	m_pVertexBuffer->Release();
+
+	m_RTVHeap.pHeap->Release();
+
+	for (UINT i = 0; i < SWAP_CHAIN_BUFFER; ++i)
+	{
+		m_FrameObjects[i].pCommandAllocator->Release();
+		m_FrameObjects[i].pSwapChainBuffer->Release();
+	}
+
+	CloseHandle(m_hFenceEvent);
+	m_pFence->Release();
+	m_pCommandList->Release();
+	m_pSwapChain->Release();
+	m_pCommandQueue->Release();
+	m_pDevice->Release();
 }
 
 void Application::InitDXR()
@@ -173,7 +220,11 @@ void Application::InitDXR()
 		__debugbreak();
 	}
 
-	m_RTVHeap.pHeap;
+	m_RTVHeap.pHeap = CreateDescriptorHeap(m_pDevice, RTV_HEAP_SIZE, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
+	if (!m_RTVHeap.pHeap)
+	{
+		__debugbreak();
+	}
 
 	for (UINT i = 0, size = _countof(m_FrameObjects); i < size; ++i)
 	{
@@ -204,7 +255,7 @@ void Application::InitDXR()
 		__debugbreak();
 	}
 
-	m_hFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	m_hFenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 	if (!m_hFenceEvent || m_hFenceEvent == INVALID_HANDLE_VALUE)
 	{
 		__debugbreak();
@@ -280,6 +331,10 @@ void Application::CreateAccelerationStructures()
 	// Store the AS buffers. The rest of the buffers will be released once we exit the function
 	m_pTopLevelAS = topLevelBuffers.pResult;
 	m_pBottomLevelAS = bottomLevelBuffers.pResult;
+
+	bottomLevelBuffers.pScratch->Release();
+	topLevelBuffers.pScratch->Release();
+	topLevelBuffers.pInstanceDesc->Release();
 }
 
 void Application::CreateRTPipelineState()
@@ -319,8 +374,8 @@ void Application::CreateRTPipelineState()
 	subObjects[index] = hitMissRootSignature.SubObject; // 4 Root Sig to be shared between Miss and CHS
 
 	UINT hitMissRootIndex = index++; // 4
-	const WCHAR* missHitExportName[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER };
-	ExportAssociation missHitRootAssociation(missHitExportName, _countof(missHitExportName), &subObjects[hitMissRootIndex]);
+	const WCHAR* pszMISS_HIT_EXPORT_NAME[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER };
+	ExportAssociation missHitRootAssociation(pszMISS_HIT_EXPORT_NAME, _countof(pszMISS_HIT_EXPORT_NAME), &subObjects[hitMissRootIndex]);
 	subObjects[index++] = missHitRootAssociation.SubObject; // 5 Associate Root Sig to Miss and CHS
 
 	// Bind the payload size to the programs
@@ -328,8 +383,8 @@ void Application::CreateRTPipelineState()
 	subObjects[index] = shaderConfig.SubObject; // 6 Shader Config
 
 	UINT shaderConfigIndex = index++; // 6
-	const WCHAR* shaderExports[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER, pszRAY_GEN_SHADER };
-	ExportAssociation configAssociation(shaderExports, _countof(shaderExports), &(subObjects[shaderConfigIndex]));
+	const WCHAR* pszSHADER_EXPORTS[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER, pszRAY_GEN_SHADER };
+	ExportAssociation configAssociation(pszSHADER_EXPORTS, _countof(pszSHADER_EXPORTS), &(subObjects[shaderConfigIndex]));
 	subObjects[index++] = configAssociation.SubObject; // 7 Associate Shader Config to Miss, CHS, RGS
 
 	// Create the pipeline config
@@ -760,7 +815,7 @@ ID3D12RootSignature* Application::CreateRootSignature(ID3D12Device5* pDevice, co
 
 DXILLibrary Application::CreateDXILLibrary()
 {
-	ID3DBlob* pDXILLib = CompileLibrary(L"./Shader.hlsl", L"lib_6_3");
+	ID3DBlob* pDXILLib = CompileLibrary(L"Shader.hlsl", L"lib_6_3");
 	const WCHAR* pszENTRY_POINTS[] = { pszRAY_GEN_SHADER, pszMISS_SHADER, pszCLOSEST_HIT_SHADER };
 	return DXILLibrary(pDXILLib, pszENTRY_POINTS, _countof(pszENTRY_POINTS));
 }
@@ -800,13 +855,24 @@ RootSignatureDesc Application::CreateRayGenRootDesc()
 ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* pszTARGET_STRING)
 {
 	HRESULT hr = S_OK;
-
-	DxcDLLSupport dxcDllHelper;
+	
 	IDxcCompiler* pCompiler = nullptr;
 	IDxcLibrary* pLibrary = nullptr;
-	dxcDllHelper.Initialize();
-	dxcDllHelper.CreateInstance(CLSID_DxcCompiler, &pCompiler);
-	dxcDllHelper.CreateInstance(CLSID_DxcCompiler, &pLibrary);
+	hr = g_DxcDllHelper.Initialize();
+	if (FAILED(hr))
+	{
+		__debugbreak();
+	}
+	hr = g_DxcDllHelper.CreateInstance(CLSID_DxcCompiler, &pCompiler);
+	if (FAILED(hr))
+	{
+		__debugbreak();
+	}
+	hr = g_DxcDllHelper.CreateInstance(CLSID_DxcLibrary, &pLibrary);
+	if (FAILED(hr))
+	{
+		__debugbreak();
+	}
 
 	std::ifstream shaderFile(pszFILE_NAME);
 	if (!shaderFile.good())
@@ -814,7 +880,7 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 		pCompiler->Release();
 		pLibrary->Release();
 
-		OutputDebugString(L"Can't open file!\n");
+		OutputDebugStringA("Can't open file!\n");
 
 		return nullptr;
 	}
@@ -833,6 +899,16 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 	}
 
 	IDxcOperationResult* pResult = nullptr;
+	hr = pCompiler->Compile(pTextBlob, pszFILE_NAME, L"", pszTARGET_STRING, nullptr, 0, nullptr, 0, nullptr, &pResult);
+	if (FAILED(hr))
+	{
+		pTextBlob->Release();
+		pCompiler->Release();
+		pLibrary->Release();
+
+		return nullptr;
+	}
+
 	pResult->GetStatus(&hr);
 	if (FAILED(hr))
 	{
@@ -842,6 +918,7 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 		OutputDebugStringA((const char*)pError->GetBufferPointer());
 
 		pError->Release();
+		pResult->Release();
 		pTextBlob->Release();
 		pCompiler->Release();
 		pLibrary->Release();
