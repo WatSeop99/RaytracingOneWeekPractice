@@ -134,6 +134,8 @@ static const WCHAR* pszMISS_SHADER = L"Miss";
 static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
 static const WCHAR* pszHIT_GROUP = L"HitGroup";
 
+class DescriptorAllocator;
+
 class Application final : public BaseForm
 {
 public:
@@ -148,6 +150,12 @@ public:
 	void OnLoad() override;
 	void OnFrameRender() override;
 	void OnShutdown() override;
+
+	UINT64 Fence();
+	void WaitForGPU(UINT64 expectedValue);
+
+	inline ID3D12Device5* GetDevice() { return m_pDevice; }
+	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCommandQueue; }
 
 private:
 	void InitDXR();
@@ -176,7 +184,7 @@ private:
 	RootSignatureDesc CreateRayGenRootDesc();
 	ID3DBlob* CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* pszTARGET_STRING);
 
-	UINT64 SubmitCommandList(ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, ID3D12Fence* pFence, UINT64 fenceValue);
+	UINT64 SubmitCommandList();
 	void ResourceBarrier(ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
 
 private:
@@ -206,4 +214,7 @@ private:
 
 	ID3D12Resource* m_pOutputResource = nullptr;
 	ID3D12DescriptorHeap* m_pCBVSRVUAVHeap = nullptr;
+
+	DescriptorAllocator* m_pRTVAllocator = nullptr;
+	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;
 };

@@ -1,4 +1,5 @@
 #include "framework.h"
+#include "DescriptorAllocator.h"
 #include "DxcDLLSupport.h"
 #include "Application.h"
 
@@ -147,11 +148,8 @@ void Application::OnFrameRender()
 
 void Application::OnShutdown()
 {
-	++m_FenceValue;
-
-	m_pCommandQueue->Signal(m_pFence, m_FenceValue);
-	m_pFence->SetEventOnCompletion(m_FenceValue, m_hFenceEvent);
-	WaitForSingleObject(m_hFenceEvent, INFINITE);
+	UINT64 lastFenceValue = Fence();
+	WaitForGPU(lastFenceValue);
 
 	m_pCBVSRVUAVHeap->Release();
 	m_pOutputResource->Release();
@@ -179,6 +177,22 @@ void Application::OnShutdown()
 	m_pSwapChain->Release();
 	m_pCommandQueue->Release();
 	m_pDevice->Release();
+}
+
+UINT64 Application::Fence()
+{
+	++m_FenceValue;
+	m_pCommandQueue->Signal(m_pFence, m_FenceValue);
+	return m_FenceValue;
+}
+
+void Application::WaitForGPU(UINT64 expectedValue)
+{
+	if (m_pFence->GetCompletedValue() < expectedValue)
+	{
+		m_pFence->SetEventOnCompletion(expectedValue, m_hFenceEvent);
+		WaitForSingleObject(m_hFenceEvent, INFINITE);
+	}
 }
 
 void Application::InitDXR()
@@ -285,8 +299,7 @@ void Application::EndFrame()
 
 	ID3D12CommandList* ppCommandLists[] = { m_pCommandList };
 	m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-	++m_FenceValue;
-	m_pCommandQueue->Signal(m_pFence, m_FenceValue);
+	Fence();
 
 	
 	/// Swap buffer.
@@ -321,11 +334,9 @@ void Application::CreateAccelerationStructures()
 	AccelerationStructureBuffers topLevelBuffers = CreateTopLevelAS(m_pDevice, m_pCommandList, bottomLevelBuffers.pResult, &m_TlasSize);
 
 	// The tutorial doesn't have any resource lifetime management, so we flush and sync here. This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
-	m_FenceValue = SubmitCommandList(m_pCommandList, m_pCommandQueue, m_pFence, m_FenceValue);
-	m_pFence->SetEventOnCompletion(m_FenceValue, m_hFenceEvent);
-	WaitForSingleObject(m_hFenceEvent, INFINITE);
+	UINT64 lastFenceValue = SubmitCommandList();
+	WaitForGPU(lastFenceValue);
 
-	UINT bufferIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 	m_pCommandList->Reset(m_FrameObjects[0].pCommandAllocator, nullptr);
 
 	// Store the AS buffers. The rest of the buffers will be released once we exit the function
@@ -937,20 +948,18 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 	return (ID3DBlob*)pBlob;
 }
 
-UINT64 Application::SubmitCommandList(ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, ID3D12Fence* pFence, UINT64 fenceValue)
+UINT64 Application::SubmitCommandList()
 {
-	_ASSERT(pCommandList);
-	_ASSERT(pCommandQueue);
-	_ASSERT(pFence);
+	_ASSERT(m_pCommandList);
+	_ASSERT(m_pCommandQueue);
+	_ASSERT(m_pFence);
 
-	pCommandList->Close();
+	m_pCommandList->Close();
 
-	ID3D12CommandList* ppCommandLists[] = { pCommandList, };
-	pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	ID3D12CommandList* ppCommandLists[] = { m_pCommandList, };
+	m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	++fenceValue;
-	pCommandQueue->Signal(pFence, fenceValue);
-	return fenceValue;
+	return Fence();
 }
 
 void Application::ResourceBarrier(ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter)
