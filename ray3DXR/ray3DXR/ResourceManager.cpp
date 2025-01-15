@@ -11,6 +11,7 @@ bool ResourceManager::Initialize(Application* pApp)
 	{
 		goto LB_RET;
 	}
+	m_pApp = pApp;
 
 	m_pDevice = pApp->GetDevice();
 	m_pDevice->AddRef();
@@ -29,6 +30,8 @@ bool ResourceManager::Initialize(Application* pApp)
 	{
 		goto LB_RET;
 	}
+
+	m_pCommandList->Close();
 
 	bRet = true;
 
@@ -87,7 +90,7 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 	HRESULT hr = m_pDevice->CreateCommittedResource(&heapProperties,
 													D3D12_HEAP_FLAG_NONE,
 													&resourceDesc,
-													D3D12_RESOURCE_STATE_COMMON,
+													D3D12_RESOURCE_STATE_GENERIC_READ,
 													nullptr,
 													IID_PPV_ARGS(&pResource));
 	if (FAILED(hr))
@@ -100,14 +103,22 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 
 	if (pInitData)
 	{
-		m_pCommandAllocator->Reset();
-		m_pCommandList->Reset(m_pCommandAllocator, nullptr);
+		hr = m_pCommandAllocator->Reset();
+		if (FAILED(hr))
+		{
+			__debugbreak();
+		}
+		hr = m_pCommandList->Reset(m_pCommandAllocator, nullptr);
+		if (FAILED(hr))
+		{
+			__debugbreak();
+		}
 
 		heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		hr = m_pDevice->CreateCommittedResource(&heapProperties,
 												D3D12_HEAP_FLAG_NONE,
 												&resourceDesc,
-												D3D12_RESOURCE_STATE_COMMON,
+												D3D12_RESOURCE_STATE_COPY_SOURCE,
 												nullptr,
 												IID_PPV_ARGS(&pUploadResource));
 		if (FAILED(hr))
@@ -121,8 +132,8 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 		BYTE* pVertexDataBegin = nullptr;
 		CD3DX12_RANGE readRange(0, 0);
 
-		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
 		m_pCommandList->ResourceBarrier(1, &BEFORE_BARRIER);
 		m_pCommandList->CopyBufferRegion(pResource, 0, pUploadResource, 0, bufferSize);
 		m_pCommandList->ResourceBarrier(1, &AFTER_BARRIER);

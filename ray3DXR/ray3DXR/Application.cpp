@@ -1,6 +1,8 @@
 #include "framework.h"
+#include "CommonDefine.h"
 #include "DescriptorAllocator.h"
 #include "DxcDLLSupport.h"
+#include "ResourceManager.h"
 #include "Application.h"
 
 struct LocalRootSignature
@@ -151,6 +153,12 @@ void Application::OnShutdown()
 	UINT64 lastFenceValue = Fence();
 	WaitForGPU(lastFenceValue);
 
+	if (m_pResourceManager)
+	{
+		delete m_pResourceManager;
+		m_pResourceManager = nullptr;
+	}
+
 	m_pCBVSRVUAVHeap->Release();
 	m_pOutputResource->Release();
 
@@ -274,6 +282,9 @@ void Application::InitDXR()
 	{
 		__debugbreak();
 	}
+
+	m_pResourceManager = new ResourceManager;
+	m_pResourceManager->Initialize(this);
 }
 
 UINT Application::BeginFrame()
@@ -650,18 +661,23 @@ ID3D12Resource* Application::CreateTriangleVB(ID3D12Device5* pDevice)
 		DirectX::XMFLOAT3(-0.866f, -0.5f, 0.0f)
 	};
 
-	CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD, 0, 0);
+	/*CD3DX12_HEAP_PROPERTIES uploadHeapProps(D3D12_HEAP_TYPE_UPLOAD, 0, 0);
 	ID3D12Resource* pBuffer = CreateBuffer(pDevice, sizeof(VERTICES), D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeapProps);
 	if (!pBuffer)
 	{
-		__debugbreak();
 		return nullptr;
 	}
 	
 	UINT8* pData = nullptr;
 	pBuffer->Map(0, nullptr, (void**)&pData);
 	memcpy(pData, VERTICES, sizeof(VERTICES));
-	pBuffer->Unmap(0, nullptr);
+	pBuffer->Unmap(0, nullptr);*/
+	Buffer* pBufferData = m_pResourceManager->CreateVertexBuffer(sizeof(DirectX::XMFLOAT3), 3, (void*)VERTICES);
+	ID3D12Resource* pBuffer = pBufferData->pResource;
+	pBuffer->AddRef();
+
+	pBufferData->pResource->Release();
+	delete pBufferData;
 
 	return pBuffer;
 }

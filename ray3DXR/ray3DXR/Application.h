@@ -135,6 +135,7 @@ static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
 static const WCHAR* pszHIT_GROUP = L"HitGroup";
 
 class DescriptorAllocator;
+class ResourceManager;
 
 class Application final : public BaseForm
 {
@@ -214,6 +215,8 @@ private:
 
 	ID3D12Resource* m_pOutputResource = nullptr;
 	ID3D12DescriptorHeap* m_pCBVSRVUAVHeap = nullptr;
+
+	ResourceManager* m_pResourceManager = nullptr;
 
 	DescriptorAllocator* m_pRTVAllocator = nullptr;
 	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;

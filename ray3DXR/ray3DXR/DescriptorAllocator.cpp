@@ -43,6 +43,8 @@ bool DescriptorAllocator::Cleanup()
 		m_pDevice->Release();
 		m_pDevice = nullptr;
 	}
+
+	return true;
 }
 
 UINT DescriptorAllocator::AllocDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE* pOutCPUHandle)

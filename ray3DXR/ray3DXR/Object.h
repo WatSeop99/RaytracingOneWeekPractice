@@ -1,5 +1,7 @@
 #pragma once
 
+struct ID3D12Resource;
+
 class Object
 {
 public:
