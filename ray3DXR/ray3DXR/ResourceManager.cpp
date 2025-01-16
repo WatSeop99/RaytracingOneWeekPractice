@@ -72,8 +72,11 @@ LB_RET:
 	return bRet;
 }
 
-Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, void* pInitData)
+Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, const void* pINIT_DATA)
 {
+	_ASSERT(sizePerVertex > 0);
+	_ASSERT(numVertex > 0);
+
 	Buffer* pRetBuffer = new Buffer;
 	if (!pRetBuffer)
 	{
@@ -101,7 +104,7 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 	}
 
 
-	if (pInitData)
+	if (pINIT_DATA)
 	{
 		hr = m_pCommandAllocator->Reset();
 		if (FAILED(hr))
@@ -115,12 +118,7 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 		}
 
 		heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		hr = m_pDevice->CreateCommittedResource(&heapProperties,
-												D3D12_HEAP_FLAG_NONE,
-												&resourceDesc,
-												D3D12_RESOURCE_STATE_COPY_SOURCE,
-												nullptr,
-												IID_PPV_ARGS(&pUploadResource));
+		hr = m_pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&pUploadResource));
 		if (FAILED(hr))
 		{
 			delete pRetBuffer;
@@ -131,6 +129,15 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 
 		BYTE* pVertexDataBegin = nullptr;
 		CD3DX12_RANGE readRange(0, 0);
+		hr = pUploadResource->Map(0, &readRange, (void**)&pVertexDataBegin);
+		if (FAILED(hr))
+		{
+			delete pRetBuffer;
+			pRetBuffer = nullptr;
+			goto LB_RET;
+		}
+		memcpy(pVertexDataBegin, pINIT_DATA, bufferSize);
+		pUploadResource->Unmap(0, nullptr);
 
 		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
 		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -140,8 +147,8 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 
 		m_pCommandList->Close();
 
-		ID3D12CommandList* ppCommandLists[1] = { m_pCommandList };
-		m_pCommandQueue->ExecuteCommandLists(1, ppCommandLists);
+		ID3D12CommandList* ppCommandList[] = { m_pCommandList };
+		m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandList), ppCommandList);
 
 		UINT64 lastFenceValue = m_pApp->Fence();
 		m_pApp->WaitForGPU(lastFenceValue);
@@ -156,7 +163,87 @@ LB_RET:
 	return pRetBuffer;
 }
 
-Buffer* ResourceManager::CreateIndexBuffer()
+Buffer* ResourceManager::CreateIndexBuffer(UINT sizePerIndex, UINT numIndex, const void* pINIT_DATA)
 {
-	return nullptr;
+	_ASSERT(sizePerIndex);
+	_ASSERT(numIndex);
+
+	Buffer* pRetBuffer = new Buffer;
+	if (!pRetBuffer)
+	{
+		goto LB_RET;
+	}
+	ZeroMemory(pRetBuffer, sizeof(Buffer));
+
+
+	ID3D12Resource* pResource = nullptr;
+	ID3D12Resource* pUploadResource = nullptr;
+
+	UINT bufferSize = sizePerIndex * numIndex;
+	CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
+	HRESULT hr = m_pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pResource));
+	if (FAILED(hr))
+	{
+		delete pRetBuffer;
+		pRetBuffer = nullptr;
+		goto LB_RET;
+	}
+
+	if (pINIT_DATA)
+	{
+		hr = m_pCommandAllocator->Reset();
+		if (FAILED(hr))
+		{
+			__debugbreak();
+		}
+		hr = m_pCommandList->Reset(m_pCommandAllocator, nullptr);
+		if (FAILED(hr))
+		{
+			__debugbreak();
+		}
+
+		heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		hr = m_pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&pUploadResource));
+		if (FAILED(hr))
+		{
+			delete pRetBuffer;
+			pRetBuffer = nullptr;
+			goto LB_RET;
+		}
+
+		BYTE* pIndexDataBegin = nullptr;
+		CD3DX12_RANGE readRange(0, 0);
+		hr = pUploadResource->Map(0, &readRange, (void**)&pIndexDataBegin);
+		if (FAILED(hr))
+		{
+			delete pRetBuffer;
+			pRetBuffer = nullptr;
+			goto LB_RET;
+		}
+		memcpy(pIndexDataBegin, pINIT_DATA, bufferSize);
+		pUploadResource->Unmap(0, nullptr);
+
+		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+		m_pCommandList->ResourceBarrier(1, &BEFORE_BARRIER);
+		m_pCommandList->CopyBufferRegion(pResource, 0, pUploadResource, 0, bufferSize);
+		m_pCommandList->ResourceBarrier(1, &AFTER_BARRIER);
+
+		m_pCommandList->Close();
+
+		ID3D12CommandList* ppCommandList[] = { m_pCommandList };
+		m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandList), ppCommandList);
+
+		UINT64 lastFenceValue = m_pApp->Fence();
+		m_pApp->WaitForGPU(lastFenceValue);
+
+		pUploadResource->Release();
+		pUploadResource = nullptr;
+	}
+
+	pRetBuffer->pResource = pResource;
+
+LB_RET:
+	return pRetBuffer;
 }

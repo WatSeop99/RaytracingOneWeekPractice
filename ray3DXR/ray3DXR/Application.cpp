@@ -3,6 +3,7 @@
 #include "DescriptorAllocator.h"
 #include "DxcDLLSupport.h"
 #include "ResourceManager.h"
+#include "TextureManager.h"
 #include "Application.h"
 
 struct LocalRootSignature
@@ -94,9 +95,6 @@ struct GlobalRootSignature
 
 DxcDLLSupport g_DxcDllHelper;
 
-Application::~Application()
-{}
-
 void Application::OnLoad()
 {
 	InitDXR();
@@ -158,6 +156,11 @@ void Application::OnShutdown()
 		delete m_pResourceManager;
 		m_pResourceManager = nullptr;
 	}
+	if (m_pTextureManager)
+	{
+		delete m_pTextureManager;
+		m_pTextureManager = nullptr;
+	}
 
 	m_pCBVSRVUAVHeap->Release();
 	m_pOutputResource->Release();
@@ -172,6 +175,16 @@ void Application::OnShutdown()
 	m_pVertexBuffer->Release();
 
 	m_RTVHeap.pHeap->Release();
+	if (m_pRTVAllocator)
+	{
+		delete m_pRTVAllocator;
+		m_pRTVAllocator = nullptr;
+	}
+	if (m_pCBVSRVUAVAllocator)
+	{
+		delete m_pCBVSRVUAVAllocator;
+		m_pCBVSRVUAVAllocator = nullptr;
+	}
 
 	for (UINT i = 0; i < SWAP_CHAIN_BUFFER; ++i)
 	{
@@ -285,6 +298,14 @@ void Application::InitDXR()
 
 	m_pResourceManager = new ResourceManager;
 	m_pResourceManager->Initialize(this);
+
+	m_pTextureManager = new TextureManager;
+	m_pTextureManager->Initialize(this);
+
+	m_pRTVAllocator = new DescriptorAllocator;
+	m_pRTVAllocator->Initialize(m_pDevice, 5, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_pCBVSRVUAVAllocator = new DescriptorAllocator;
+	m_pCBVSRVUAVAllocator->Initialize(m_pDevice, 256, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 UINT Application::BeginFrame()

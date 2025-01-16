@@ -1,6 +1,21 @@
 RaytracingAccelerationStructure g_RtScene : register(t0);
 RWTexture2D<float4> g_Output : register(u0);
 
+//ByteAddressBuffer g_Indices : register(t1);
+//StructuredBuffer<Vertex> g_Vertices : register(t2);
+
+//uint3 Load3x32BitIndices(uint offsetBytes)
+//{
+//    uint3 indices;
+    
+//    // ByteAddressBuffer는 4byte 단위로 읽어올 수 있다.
+//    // 어차피 인덱스로 32비트 정수형 데이터를 쓰기 때문에
+//    // 인자로 들어온 오프셋 바이트 포함 총 3개의 인덱스를 읽어오면 된다.
+//    indices = g_Indices.Load3(offsetBytes);
+    
+//    return indices;
+//}
+
 float3 LinearToSRGB(float3 c)
 {
     float3 sq1 = sqrt(c);
@@ -56,4 +71,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     const float3 C = float3(0, 0, 1);
 
     payload.Color = A * barycentrics.x + B * barycentrics.y + C * barycentrics.z;
+
+
+    
 }

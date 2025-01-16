@@ -12,8 +12,8 @@ public:
 	bool Initialize(Application* pApp);
 	bool Cleanup();
 
-	Buffer* CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, void* pInitData);
-	Buffer* CreateIndexBuffer();
+	Buffer* CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, const void* pINIT_DATA);
+	Buffer* CreateIndexBuffer(UINT sizePerIndex, UINT numIndex, const void* pINIT_DATA);
 
 private:
 	ID3D12Device5* m_pDevice = nullptr;

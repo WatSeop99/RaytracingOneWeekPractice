@@ -136,6 +136,7 @@ static const WCHAR* pszHIT_GROUP = L"HitGroup";
 
 class DescriptorAllocator;
 class ResourceManager;
+class TextureManager;
 
 class Application final : public BaseForm
 {
@@ -146,7 +147,7 @@ public:
 
 public:
 	Application(HINSTANCE hInstance) : BaseForm(hInstance) {}
-	~Application();
+	~Application() = default;
 
 	void OnLoad() override;
 	void OnFrameRender() override;
@@ -157,6 +158,10 @@ public:
 
 	inline ID3D12Device5* GetDevice() { return m_pDevice; }
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCommandQueue; }
+	inline ResourceManager* GetResourceManager() { return m_pResourceManager; }
+	inline TextureManager* GetTextureManager() { return m_pTextureManager; }
+	inline DescriptorAllocator* GetRTVAllocator() { return m_pRTVAllocator; }
+	inline DescriptorAllocator* GetCBVSRVUAVAllocator() { return m_pCBVSRVUAVAllocator; }
 
 private:
 	void InitDXR();
@@ -217,6 +222,7 @@ private:
 	ID3D12DescriptorHeap* m_pCBVSRVUAVHeap = nullptr;
 
 	ResourceManager* m_pResourceManager = nullptr;
+	TextureManager* m_pTextureManager = nullptr;
 
 	DescriptorAllocator* m_pRTVAllocator = nullptr;
 	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;
