@@ -1,62 +1,82 @@
 #pragma once
 
+class ConstantBuffer;
 class Texture;
+
+enum MaterialType
+{
+	MaterialType_None = 0,
+	MaterialType_Labmertian,
+	MaterialType_Metal,
+	MaterialType_Dieletric,
+	MaterialType_DiffuseLight,
+	MaterialType_Count
+};
+
+__declspec(align(16)) struct MaterialConstantsData
+{
+	int MatType;
+	DirectX::XMFLOAT3 Color;
+	float Fuzz;
+	float RefractionIndex;
+
+	float dummy[2];
+};
 
 interface Material
 {
-	virtual bool Initialize() = 0;
 	virtual bool Cleanup() = 0;
 
-	// ConstantBuffer* m_pConstantBuffer;
+	ConstantBuffer* m_pConstantBuffer;
 };
 
-class Lambertian : public Material
+class Lambertian final : public Material
 {
 public:
 	Lambertian() = default;
-	~Lambertian() = default;
+	~Lambertian() { Cleanup(); }
 
-	bool Initialize() override;
+	bool Initialize(ID3D12Device5* pDevice, const DirectX::XMFLOAT3& COLOR);
 	bool Cleanup() override;
 
 private:
 	Texture* m_pTexture = nullptr;
 };
 
-class Metal : public Material
+class Metal final : public Material
 {
 public:
 	Metal() = default;
-	~Metal() = default;
+	~Metal() { Cleanup(); }
 
-	bool Initialize() override;
+	bool Initialize(ID3D12Device5* pDevice, const DirectX::XMFLOAT3& COLOR, const float FUZZ);
 	bool Cleanup() override;
 
 private:
 	DirectX::XMFLOAT3 m_Albedo;
-	double m_Fuzz;
+	float m_Fuzz;
 };
 
-class Dielectric : public Material
+class Dielectric final : public Material
 {
 public:
 	Dielectric() = default;
-	~Dielectric() = default;
+	~Dielectric() { Cleanup(); }
 
-	bool Initialize() override;
+	bool Initialize(ID3D12Device5* pDevice, const float REFRACTION_INDEX);
 	bool Cleanup() override;
 
 private:
-	double m_RefractionIndex;
+	float m_RefractionIndex;
 };
 
-class DiffuseLight : public Material
+class DiffuseLight final : public Material
 {
 public:
 	DiffuseLight() = default;
-	~DiffuseLight() = default;
+	~DiffuseLight() { Cleanup(); }
 
-	bool Initialize() override;
+	bool Initialize(ID3D12Device5* pDevice, const DirectX::XMFLOAT3& COLOR);
 	bool Cleanup() override;
 
 private:

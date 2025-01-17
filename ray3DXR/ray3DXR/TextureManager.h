@@ -27,6 +27,8 @@ private:
 	HRESULT CreateNonImageBuffer(ID3D12Resource** ppOutResource, UINT sizePerEleme, UINT numElements);
 
 private:
+	
+
 	// DO NOT Release directly.
 	Application* m_pApp = nullptr;
 };
