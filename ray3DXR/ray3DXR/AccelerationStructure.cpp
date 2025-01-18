@@ -318,7 +318,7 @@ bool AccelerationStructureManager::InitializeTopLevelAS(ID3D12Device5* pDevice, 
 	m_ScratchResourceSize = max(m_TopLevelAS.GetRequiredScratchSize(), m_ScratchResourceSize);
 
 	CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_ScratchResourceSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	HRESULT hr = pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_pAccelerationStructureScratch));
 	if (FAILED(hr))
 	{
@@ -330,21 +330,22 @@ bool AccelerationStructureManager::InitializeTopLevelAS(ID3D12Device5* pDevice, 
 
 bool AccelerationStructureManager::Build(ID3D12GraphicsCommandList4* pCommandList, ID3D12DescriptorHeap* pDescriptorHeap, UINT frameIndex, bool bForceBuild)
 {
+	_ASSERT(pCommandList);
+	_ASSERT(pDescriptorHeap);
+
 	m_pBottomLevelASInstanceDescs->Upload();
 
 	// Build all bottom-level AS.
 	{
-		for (auto& bottomLevelASpair : m_vBottomLevelAS)
+		for (auto iter = m_BottomLevelASs.begin(), endIter = m_BottomLevelASs.end(); iter != endIter; ++iter)
 		{
-			auto& bottomLevelAS = bottomLevelASpair.second;
+			BottomLevelAccelerationStructure& bottomLevelAS = iter->second;
 			if (bForceBuild || bottomLevelAS.IsDirty())
 			{
 				D3D12_GPU_VIRTUAL_ADDRESS baseGeometryTransformGpuAddress = 0;
-				bottomLevelAS.Build(commandList, m_accelerationStructureScratch.Get(), descriptorHeap, baseGeometryTransformGpuAddress);
+				bottomLevelAS.Build(pCommandList, m_pAccelerationStructureScratch, pDescriptorHeap, baseGeometryTransformGpuAddress);
 
-				// Since a single scratch resource is reused, put a barrier in-between each call.
-				// PEFORMANCE tip: use separate scratch memory per BLAS build to allow a GPU driver to overlap build calls.
-				commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.GetResource()));
+				pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.GetResource()));
 			}
 		}
 	}
@@ -352,11 +353,23 @@ bool AccelerationStructureManager::Build(ID3D12GraphicsCommandList4* pCommandLis
 	// Build the top-level AS.
 	{
 		bool bPerformUpdate = false; // Always rebuild top-level Acceleration Structure.
-		D3D12_GPU_VIRTUAL_ADDRESS instanceDescs = m_bottomLevelASInstanceDescs.GpuVirtualAddress(frameIndex);
-		m_topLevelAS.Build(commandList, GetNumberOfBottomLevelASInstances(), instanceDescs, m_accelerationStructureScratch.Get(), descriptorHeap, bPerformUpdate);
+		D3D12_GPU_VIRTUAL_ADDRESS instanceDescs = m_pBottomLevelASInstanceDescs->GetResource()->GetGPUVirtualAddress();
+		m_TopLevelAS.Build(pCommandList, GetNumberOfBottomLevelASInstances(), instanceDescs, m_pAccelerationStructureScratch, pDescriptorHeap, bPerformUpdate);
 
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_topLevelAS.GetResource()));
+		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_TopLevelAS.GetResource()));
 	}
 
 	return true;
+}
+
+UINT AccelerationStructureManager::GetMaxInstanceContributionToHitGroupIndex()
+{
+	UINT maxInstanceContributionToHitGroupIndex = 0;
+	D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDatas = (D3D12_RAYTRACING_INSTANCE_DESC*)m_pBottomLevelASInstanceDescs->GetDataMem();
+	for (UINT i = 0; i < m_NumBottomLevelASInstances; i++)
+	{
+		D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = pInstanceDatas[i];
+		maxInstanceContributionToHitGroupIndex = max(maxInstanceContributionToHitGroupIndex, instanceDesc.InstanceContributionToHitGroupIndex);
+	}
+	return maxInstanceContributionToHitGroupIndex;
 }

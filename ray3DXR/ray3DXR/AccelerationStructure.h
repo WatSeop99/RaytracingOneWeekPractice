@@ -114,6 +114,12 @@ public:
 
 	bool Build(ID3D12GraphicsCommandList4* pCommandList, ID3D12DescriptorHeap* pDescriptorHeap, UINT frameIndex, bool bForceBuild = false);
 
+	inline BottomLevelAccelerationStructure& GetBottomLevelAS(const WCHAR* pszNAME) { return m_BottomLevelASs[pszNAME]; }
+	inline ID3D12Resource* GetTopLevelResource() { return m_TopLevelAS.GetResource(); }
+	inline UINT64 GetASMemoryFootprint() { return m_ASMemoryFootprint; }
+	inline UINT GetNumberOfBottomLevelASInstances() { return m_pBottomLevelASInstanceDescs->GetNumData(); }
+	UINT GetMaxInstanceContributionToHitGroupIndex();
+
 private:
 	TopLevelAccelerationStructure m_TopLevelAS;
 	std::map<const WCHAR*, BottomLevelAccelerationStructure> m_BottomLevelASs;
