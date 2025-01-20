@@ -1,18 +1,235 @@
 #include "framework.h"
+#include "AccelerationStructure.h"
+#include "Application.h"
+#include "GPUResource.h"
+#include "Material.h"
+#include "ResourceManager.h"
+#include "Vertex.h"
 #include "Object.h"
+
+UINT Quad::ms_QuadCount = 0;
+UINT Box::ms_BoxCount = 0;
+UINT Sphere::ms_SphereCount = 0;
+
+bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES)
+{
+	_ASSERT(pszNAME);
+	_ASSERT(pVERTICES);
+	_ASSERT(pINDICES);
+	_ASSERT(m_pApp);
+	_ASSERT(!m_pGeometryInfo);
+	_ASSERT(!m_pConstantBuffer);
+	_ASSERT(m_MaterialID != UINT_MAX);
+
+	ID3D12Device5* pDevice = m_pApp->GetDevice();
+
+	m_pGeometryInfo = new BottomLevelAccelerationStructureGeometry;
+	if (!m_pGeometryInfo)
+	{
+		return false;
+	}
+
+	// Set name.
+	swprintf_s(m_pGeometryInfo->m_szName, MAX_PATH, pszNAME);
+
+	// Set geometry buffer.
+	GeometryBuffer geomBuffer;
+	{
+		ResourceManager* pResourceManager = m_pApp->GetResourceManager();
+		Buffer* pVertexBuffer = nullptr;
+		Buffer* pIndexBuffer = nullptr;
+
+		pVertexBuffer = pResourceManager->CreateVertexBuffer(sizePerVertex, numVertex, pVERTICES);
+		if (!pVertexBuffer)
+		{
+			return false;
+		}
+
+		pIndexBuffer = pResourceManager->CreateIndexBuffer(sizePerIndex, numIndex, pINDICES);
+		if (!pIndexBuffer)
+		{
+			pVertexBuffer->pResource->Release();
+			delete pVertexBuffer;
+			return false;
+		}
+
+		memcpy(&geomBuffer.VertexBuffer, pVertexBuffer, sizeof(Buffer));
+		memcpy(&geomBuffer.IndexBuffer, pIndexBuffer, sizeof(Buffer));
+		m_pGeometryInfo->m_Geometries.push_back(geomBuffer);
+		m_pGeometryInfo->m_VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+		m_pGeometryInfo->m_IndexFormat = DXGI_FORMAT_R32_UINT;
+
+		delete pVertexBuffer;
+		delete pIndexBuffer;
+	}
+
+	// Set default geometry instance.
+	{
+		GeometryInstance geomInstance;
+		geomInstance.VB.StartIndex = 0;
+		geomInstance.VB.Count = numVertex;
+		geomInstance.VB.GPUDescriptorHandle = geomBuffer.VertexBuffer.GPUHandle;
+		geomInstance.VB.VertexBuffer.StartAddress = geomBuffer.VertexBuffer.pResource->GetGPUVirtualAddress();
+		geomInstance.VB.VertexBuffer.StrideInBytes = sizePerVertex;
+		geomInstance.IB.StartIndex = 0;
+		geomInstance.IB.Count = numIndex;
+		geomInstance.IB.GPUDescriptorHandle = geomBuffer.IndexBuffer.GPUHandle;
+		geomInstance.IB.IndexBuffer = geomBuffer.IndexBuffer.pResource->GetGPUVirtualAddress();
+		geomInstance.Transform = 0;
+		geomInstance.GeometryFlags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+
+		m_pGeometryInfo->m_GeometryInstances.push_back(geomInstance);
+	}
+
+	// Add bottom-level AS.
+	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	if (!pASManager->AddBottomLevelAS(pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE, m_pGeometryInfo, false, true))
+	{
+		return false;
+	}
+
+	// Create constant buffer.
+	m_pConstantBuffer = new ConstantBuffer;
+	if (!m_pConstantBuffer)
+	{
+		return false;
+	}
+
+	ObjectCommonCB initData = { m_MaterialID, FALSE };
+	return m_pConstantBuffer->Initialize(pDevice, sizeof(ObjectCommonCB), &initData);
+}
 
 bool Object::Cleanup()
 {
-	if (m_pVertexBuffer)
+	if (m_pGeometryInfo)
 	{
-		m_pVertexBuffer->Release();
-		m_pVertexBuffer = nullptr;
+		delete m_pGeometryInfo;
+		m_pGeometryInfo = nullptr;
 	}
-	if (m_pIndexBuffer)
+	if (m_pConstantBuffer)
 	{
-		m_pIndexBuffer->Release();
-		m_pIndexBuffer = nullptr;
+		delete m_pConstantBuffer;
+		m_pConstantBuffer = nullptr;
 	}
+	m_pApp = nullptr;
 
 	return true;
+}
+
+bool Quad::Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+{
+	_ASSERT(pApp);
+	_ASSERT(width > 0.0f);
+	_ASSERT(height > 0.0f);
+	_ASSERT(materialID != UINT_MAX);
+
+	m_pApp = pApp;
+	m_MaterialID = materialID;
+	
+	if (ms_QuadCount == 0)
+	{
+		DirectX::XMFLOAT3 normal = DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f);
+
+		float halfWidth = width * 0.5f;
+		float halfHeight = height * 0.5f;
+		Vertex vertices[4] =
+		{
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 1.0f) },
+		};
+		UINT indices[6] = { 0, 1, 2, 1, 3, 2 };
+
+		if (!Object::Initialize(L"Quad", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		{
+			return false;
+		}
+	}
+	++ms_QuadCount;
+
+	// Set bottom-level instance.
+	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	return pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
+}
+
+bool Box::Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+{
+	_ASSERT(pApp);
+	_ASSERT(width > 0.0f);
+	_ASSERT(height > 0.0f);
+	_ASSERT(depth > 0.0f);
+	_ASSERT(materialID != UINT_MAX);
+
+	m_pApp = pApp;
+	m_MaterialID = materialID;
+
+	if (ms_BoxCount == 0)
+	{
+		float halfWidth = width * 0.5f;
+		float halfHeight = height * 0.5f;
+		float halfDepth = depth * 0.5f;
+		Vertex vertices[24] =
+		{
+			// front 0~3
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+
+			// back 4~7
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+			 
+			// up 8~11
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, 1.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+
+			// down 12~15
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, -1.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(0.0f, -1.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, -1.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(0.0f, -1.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+
+			// left 16~19
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(-1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(-1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(-1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(-1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+
+			// right 20~23
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, -halfDepth), DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, halfHeight, halfDepth), DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(0.0f, 1.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, -halfDepth), DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 0.0f) },
+			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, halfDepth), DirectX::XMFLOAT3(1.0f, 0.0f, 0.0f), DirectX::XMFLOAT2(1.0f, 1.0f) },
+		};
+		UINT indices[36] =
+		{
+			0, 1, 2, 1, 3, 2,
+			4, 5, 6, 5, 7, 6,
+			8, 9, 10, 9, 11, 10,
+			12, 13, 14, 13, 15, 14,
+			16, 17, 18, 17, 19, 18,
+			20, 21, 22, 21, 23, 22
+		};
+
+		if (!Object::Initialize(L"Box", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		{
+			return false;
+		}
+	}
+	++ms_BoxCount;
+
+	// Set bottom-level instance.
+	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	return pASManager->AddBottomLevelASInstance(L"Box", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
+}
+
+bool Sphere::Initialize(Application* pApp, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+{
+	return false;
 }

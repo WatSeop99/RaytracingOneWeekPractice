@@ -36,6 +36,7 @@ void AccelerationStructure::AllocateResource(ID3D12Device5* pDevice)
 
 BottomLevelAccelerationStructureGeometry::BottomLevelAccelerationStructureGeometry(const WCHAR* pszNAME)
 {
+	_ASSERT(pszNAME);
 	wcsncpy_s(m_szName, MAX_PATH, pszNAME, wcslen(pszNAME));
 }
 
@@ -77,7 +78,7 @@ bool BottomLevelAccelerationStructure::Build(ID3D12GraphicsCommandList4* pComman
 	
 	if (m_PrebuildInfo.ScratchDataSizeInBytes > pScratch->GetDesc().Width)
 	{
-		__debugbreak();
+		//__debugbreak();
 		//L"Insufficient scratch buffer size provided!";
 		return false;
 	}
@@ -94,21 +95,19 @@ bool BottomLevelAccelerationStructure::Build(ID3D12GraphicsCommandList4* pComman
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& bottomLevelInputs = bottomLevelBuildDesc.Inputs;
+	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	bottomLevelInputs.Flags = m_BuildFlags;
+	if (m_bIsBuilt && m_bAllowUpdate && m_bUpdateOnBuild)
 	{
-		bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-		bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		bottomLevelInputs.Flags = m_BuildFlags;
-		if (m_bIsBuilt && m_bAllowUpdate && m_bUpdateOnBuild)
-		{
-			bottomLevelInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-			bottomLevelBuildDesc.SourceAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
-		}
-		bottomLevelInputs.NumDescs = (UINT)m_CacheGeometryDescs[CurrentID].size();
-		bottomLevelInputs.pGeometryDescs = m_CacheGeometryDescs[CurrentID].data();
-
-		bottomLevelBuildDesc.ScratchAccelerationStructureData = pScratch->GetGPUVirtualAddress();
-		bottomLevelBuildDesc.DestAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
+		bottomLevelInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+		bottomLevelBuildDesc.SourceAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
 	}
+	bottomLevelInputs.NumDescs = (UINT)m_CacheGeometryDescs[CurrentID].size();
+	bottomLevelInputs.pGeometryDescs = m_CacheGeometryDescs[CurrentID].data();
+
+	bottomLevelBuildDesc.ScratchAccelerationStructureData = pScratch->GetGPUVirtualAddress();
+	bottomLevelBuildDesc.DestAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
 
 	pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
 	pCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
@@ -143,8 +142,9 @@ void BottomLevelAccelerationStructure::BuildGeometryDescs(BottomLevelAcceleratio
 	geometryDescBase.Triangles.VertexFormat = pBottomLevelASGeometry->m_VertexFormat;
 
 	m_GeometryDescs.reserve(pBottomLevelASGeometry->m_GeometryInstances.size());
-	for (GeometryInstance& geometry : pBottomLevelASGeometry->m_GeometryInstances)
+	for (SIZE_T i = 0, size = pBottomLevelASGeometry->m_GeometryInstances.size(); i < size; ++i)
 	{
+		GeometryInstance& geometry = pBottomLevelASGeometry->m_GeometryInstances[i];
 		geometryDescBase.Flags = geometry.GeometryFlags;
 		geometryDescBase.Triangles.IndexBuffer = geometry.IB.IndexBuffer;
 		geometryDescBase.Triangles.IndexCount = geometry.IB.Count;
@@ -178,6 +178,7 @@ void BottomLevelAccelerationStructure::ComputePrebuildInfo(ID3D12Device5* pDevic
 bool TopLevelAccelerationStructure::Initialize(ID3D12Device5* pDevice, UINT numBottomLevelASInstanceDescs, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags, bool bAllowUpdate, bool bUpdateOnBuild, const WCHAR* pszResourceName)
 {
 	_ASSERT(pDevice);
+	_ASSERT(pszResourceName);
 
 	m_bAllowUpdate = bAllowUpdate;
 	m_bUpdateOnBuild = bUpdateOnBuild;
@@ -208,19 +209,17 @@ bool TopLevelAccelerationStructure::Build(ID3D12GraphicsCommandList4* pCommandLi
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelBuildDesc.Inputs;
+	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	topLevelInputs.Flags = m_BuildFlags;
+	if (m_bIsBuilt && m_bAllowUpdate && m_bUpdateOnBuild)
 	{
-		topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-		topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		topLevelInputs.Flags = m_BuildFlags;
-		if (m_bIsBuilt && m_bAllowUpdate && m_bUpdateOnBuild)
-		{
-			topLevelInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-		}
-		topLevelInputs.NumDescs = numInstanceDescs;
-
-		topLevelBuildDesc.ScratchAccelerationStructureData = pScratch->GetGPUVirtualAddress();
-		topLevelBuildDesc.DestAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
+		topLevelInputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
 	}
+	topLevelInputs.NumDescs = numInstanceDescs;
+
+	topLevelBuildDesc.ScratchAccelerationStructureData = pScratch->GetGPUVirtualAddress();
+	topLevelBuildDesc.DestAccelerationStructureData = m_pAccelerationStructure->GetGPUVirtualAddress();
 	topLevelInputs.InstanceDescs = instanceDescs;
 
 	pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
@@ -291,13 +290,16 @@ bool AccelerationStructureManager::AddBottomLevelAS(ID3D12Device5* pDevice, D3D1
 
 	if (m_BottomLevelASs.find(pBottomLevelASGeometry->GetName()) != m_BottomLevelASs.end())
 	{
-		__debugbreak();
+		//__debugbreak();
 		//L"A bottom level acceleration structure with that name already exists."
 		return false;
 	}
 
 	BottomLevelAccelerationStructure& bottomLevelAS = m_BottomLevelASs[pBottomLevelASGeometry->GetName()];
-	bottomLevelAS.Initialize(pDevice, buildFlags, pBottomLevelASGeometry, bAllowUpdate);
+	if (!bottomLevelAS.Initialize(pDevice, buildFlags, pBottomLevelASGeometry, bAllowUpdate))
+	{
+		return false;
+	}
 
 	m_ASMemoryFootprint += bottomLevelAS.GetRequiredResultDataSizeInBytes();
 	m_ScratchResourceSize = max(bottomLevelAS.GetRequiredScratchSize(), m_ScratchResourceSize);
@@ -307,12 +309,38 @@ bool AccelerationStructureManager::AddBottomLevelAS(ID3D12Device5* pDevice, D3D1
 	return true;
 }
 
+UINT AccelerationStructureManager::AddBottomLevelASInstance(const WCHAR* pszBottomLevelASname, UINT instanceContributionToHitGroupIndex, DirectX::XMMATRIX transform, BYTE instanceMask)
+{
+	_ASSERT(pszBottomLevelASname);
+
+	if (m_NumBottomLevelASInstances >= m_pBottomLevelASInstanceDescs->GetNumData())
+	{
+		//L"Not enough instance desc buffer size."
+		return -1;
+	}
+
+	UINT instanceIndex = m_NumBottomLevelASInstances++;
+	BottomLevelAccelerationStructure& bottomLevelAS = m_BottomLevelASs[pszBottomLevelASname];
+
+	D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)m_pBottomLevelASInstanceDescs->GetDataMem();
+	D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = pInstanceDescs[instanceIndex];
+	instanceDesc.InstanceMask = instanceMask;
+	instanceDesc.InstanceContributionToHitGroupIndex = (instanceContributionToHitGroupIndex != UINT_MAX ? instanceContributionToHitGroupIndex : bottomLevelAS.GetInstanceContributionToHitGroupIndex());
+	instanceDesc.AccelerationStructure = bottomLevelAS.GetResource()->GetGPUVirtualAddress();
+	DirectX::XMStoreFloat3x4((DirectX::XMFLOAT3X4*)instanceDesc.Transform, transform);
+
+	return instanceIndex;
+}
+
 bool AccelerationStructureManager::InitializeTopLevelAS(ID3D12Device5* pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags, bool bAllowUpdate, bool bPerformUpdateOnBuild, const WCHAR* pszResourceName)
 {
 	_ASSERT(pDevice);
 	_ASSERT(!m_pAccelerationStructureScratch);
 
-	m_TopLevelAS.Initialize(pDevice, GetNumberOfBottomLevelASInstances(), buildFlags, bAllowUpdate, bPerformUpdateOnBuild, pszResourceName);
+	if (!m_TopLevelAS.Initialize(pDevice, GetNumberOfBottomLevelASInstances(), buildFlags, bAllowUpdate, bPerformUpdateOnBuild, pszResourceName))
+	{
+		return false;
+	}
 
 	m_ASMemoryFootprint += m_TopLevelAS.GetRequiredResultDataSizeInBytes();
 	m_ScratchResourceSize = max(m_TopLevelAS.GetRequiredScratchSize(), m_ScratchResourceSize);
@@ -336,17 +364,18 @@ bool AccelerationStructureManager::Build(ID3D12GraphicsCommandList4* pCommandLis
 	m_pBottomLevelASInstanceDescs->Upload();
 
 	// Build all bottom-level AS.
+	for (auto iter = m_BottomLevelASs.begin(), endIter = m_BottomLevelASs.end(); iter != endIter; ++iter)
 	{
-		for (auto iter = m_BottomLevelASs.begin(), endIter = m_BottomLevelASs.end(); iter != endIter; ++iter)
+		BottomLevelAccelerationStructure& bottomLevelAS = iter->second;
+		if (bForceBuild || bottomLevelAS.IsDirty())
 		{
-			BottomLevelAccelerationStructure& bottomLevelAS = iter->second;
-			if (bForceBuild || bottomLevelAS.IsDirty())
+			D3D12_GPU_VIRTUAL_ADDRESS baseGeometryTransformGpuAddress = 0;
+			if (!bottomLevelAS.Build(pCommandList, m_pAccelerationStructureScratch, pDescriptorHeap, baseGeometryTransformGpuAddress))
 			{
-				D3D12_GPU_VIRTUAL_ADDRESS baseGeometryTransformGpuAddress = 0;
-				bottomLevelAS.Build(pCommandList, m_pAccelerationStructureScratch, pDescriptorHeap, baseGeometryTransformGpuAddress);
-
-				pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.GetResource()));
+				return false;
 			}
+
+			pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.GetResource()));
 		}
 	}
 
@@ -354,7 +383,10 @@ bool AccelerationStructureManager::Build(ID3D12GraphicsCommandList4* pCommandLis
 	{
 		bool bPerformUpdate = false; // Always rebuild top-level Acceleration Structure.
 		D3D12_GPU_VIRTUAL_ADDRESS instanceDescs = m_pBottomLevelASInstanceDescs->GetResource()->GetGPUVirtualAddress();
-		m_TopLevelAS.Build(pCommandList, GetNumberOfBottomLevelASInstances(), instanceDescs, m_pAccelerationStructureScratch, pDescriptorHeap, bPerformUpdate);
+		if (!m_TopLevelAS.Build(pCommandList, GetNumberOfBottomLevelASInstances(), instanceDescs, m_pAccelerationStructureScratch, pDescriptorHeap, bPerformUpdate))
+		{
+			return false;
+		}
 
 		pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_TopLevelAS.GetResource()));
 	}

@@ -30,7 +30,7 @@ protected:
 	ID3D12Resource* m_pAccelerationStructure = nullptr;
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS m_BuildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO m_PrebuildInfo = {};
-	WCHAR m_szName[MAX_PATH];
+	WCHAR m_szName[MAX_PATH] = { 0, };
 
 	bool m_bIsBuilt = false;
 	bool m_bIsDirty = true;
@@ -50,7 +50,7 @@ public:
 	inline void SetName(const WCHAR* pszNAME) { wcsncpy_s(m_szName, MAX_PATH, pszNAME, wcslen(pszNAME)); }
 
 public:
-	WCHAR m_szName[MAX_PATH];
+	WCHAR m_szName[MAX_PATH] = { 0, };
 	std::vector<GeometryInstance> m_GeometryInstances;
 	std::vector<GeometryBuffer> m_Geometries;
 	std::vector<TextureBuffer> m_Textures;
@@ -110,6 +110,7 @@ public:
 	bool Cleanup();
 
 	bool AddBottomLevelAS(ID3D12Device5* pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags, BottomLevelAccelerationStructureGeometry* pBottomLevelASGeometry, bool bAllowUpdate = false, bool bPerformUpdateOnBuild = false);
+	UINT AddBottomLevelASInstance(const WCHAR* pszBottomLevelASname, UINT instanceContributionToHitGroupIndex = UINT_MAX, DirectX::XMMATRIX transform = DirectX::XMMatrixIdentity(), BYTE instanceMask = 1);
 	bool InitializeTopLevelAS(ID3D12Device5* pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags, bool bAllowUpdate = false, bool bPerformUpdateOnBuild = false, const WCHAR* pszResourceName = nullptr);
 
 	bool Build(ID3D12GraphicsCommandList4* pCommandList, ID3D12DescriptorHeap* pDescriptorHeap, UINT frameIndex, bool bForceBuild = false);
@@ -123,9 +124,12 @@ public:
 private:
 	TopLevelAccelerationStructure m_TopLevelAS;
 	std::map<const WCHAR*, BottomLevelAccelerationStructure> m_BottomLevelASs;
+
 	StructuredBuffer* m_pBottomLevelASInstanceDescs = nullptr;
 	UINT m_NumBottomLevelASInstances = 0;
+
 	ID3D12Resource* m_pAccelerationStructureScratch = nullptr;
 	UINT64 m_ScratchResourceSize = 0;
+
 	UINT64 m_ASMemoryFootprint = 0;
 };

@@ -130,7 +130,6 @@
     <ClInclude Include="AccelerationStructure.h" />
     <ClInclude Include="Application.h" />
     <ClInclude Include="BaseForm.h" />
-    <ClInclude Include="Box.h" />
     <ClInclude Include="CommonDefine.h" />
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DescriptorAllocator.h" />
@@ -140,7 +139,6 @@
     <ClInclude Include="IndexCreator.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Object.h" />
-    <ClInclude Include="Quad.h" />
     <ClInclude Include="ray3DXR.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="ResourceManager.h" />
@@ -153,14 +151,12 @@
     <ClCompile Include="AccelerationStructure.cpp" />
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="BaseForm.cpp" />
-    <ClCompile Include="Box.cpp" />
     <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="DxcDLLSupport.cpp" />
     <ClCompile Include="GPUResource.cpp" />
     <ClCompile Include="IndexCreator.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Object.cpp" />
-    <ClCompile Include="Quad.cpp" />
     <ClCompile Include="ray3DXR.cpp" />
     <ClCompile Include="ResourceManager.cpp" />
     <ClCompile Include="Texture.cpp" />

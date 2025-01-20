@@ -38,8 +38,8 @@ struct GeometryInstance
 		};
 	};
 
-	Buffer VB;
-	Buffer IB;
+	GeometryInstance::Buffer VB;
+	GeometryInstance::Buffer IB;
 
 	D3D12_GPU_VIRTUAL_ADDRESS Transform = 0;
 	UINT MaterialID = UINT_MAX;

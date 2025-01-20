@@ -134,7 +134,9 @@ static const WCHAR* pszMISS_SHADER = L"Miss";
 static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
 static const WCHAR* pszHIT_GROUP = L"HitGroup";
 
+class AccelerationStructureManager;
 class DescriptorAllocator;
+class Material;
 class ResourceManager;
 class TextureManager;
 
@@ -160,8 +162,10 @@ public:
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCommandQueue; }
 	inline ResourceManager* GetResourceManager() { return m_pResourceManager; }
 	inline TextureManager* GetTextureManager() { return m_pTextureManager; }
+	inline AccelerationStructureManager* GetASManager() { return m_pAccelerationStructureManager; }
 	inline DescriptorAllocator* GetRTVAllocator() { return m_pRTVAllocator; }
 	inline DescriptorAllocator* GetCBVSRVUAVAllocator() { return m_pCBVSRVUAVAllocator; }
+	inline std::vector<Material*>& GetMaterials() { return m_Materials; }
 
 private:
 	void InitDXR();
@@ -223,7 +227,10 @@ private:
 
 	ResourceManager* m_pResourceManager = nullptr;
 	TextureManager* m_pTextureManager = nullptr;
+	AccelerationStructureManager* m_pAccelerationStructureManager = nullptr;
 
 	DescriptorAllocator* m_pRTVAllocator = nullptr;
 	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;
+
+	std::vector<Material*> m_Materials;
 };

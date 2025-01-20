@@ -9,21 +9,28 @@ IndexCreator::~IndexCreator()
 
 bool IndexCreator::Initialize(ULONG num)
 {
+	_ASSERT(num > 0);
+
+	bool bRet = false;
+
 	m_pIndexTable = new ULONG[num];
 	if (!m_pIndexTable)
 	{
-		return false;
+		goto LB_RET;
 	}
 
 	ZeroMemory(m_pIndexTable, sizeof(ULONG) * num);
 	m_MaxNum = num;
 
-	for (ULONG i = 0; i < m_MaxNum; ++i)
+	for (ULONG i = 0; i < num; ++i)
 	{
 		m_pIndexTable[i] = i;
 	}
 
-	return true;
+	bRet = true;
+
+LB_RET:
+	return bRet;
 }
 
 bool IndexCreator::Cleanup()

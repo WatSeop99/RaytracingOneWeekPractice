@@ -140,7 +140,7 @@ Buffer* ResourceManager::CreateVertexBuffer(UINT sizePerVertex, UINT numVertex, 
 		pUploadResource->Unmap(0, nullptr);
 
 		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
-		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 		m_pCommandList->ResourceBarrier(1, &BEFORE_BARRIER);
 		m_pCommandList->CopyBufferRegion(pResource, 0, pUploadResource, 0, bufferSize);
 		m_pCommandList->ResourceBarrier(1, &AFTER_BARRIER);
@@ -225,7 +225,7 @@ Buffer* ResourceManager::CreateIndexBuffer(UINT sizePerIndex, UINT numIndex, con
 		pUploadResource->Unmap(0, nullptr);
 
 		const CD3DX12_RESOURCE_BARRIER BEFORE_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
-		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+		const CD3DX12_RESOURCE_BARRIER AFTER_BARRIER = CD3DX12_RESOURCE_BARRIER::Transition(pResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 		m_pCommandList->ResourceBarrier(1, &BEFORE_BARRIER);
 		m_pCommandList->CopyBufferRegion(pResource, 0, pUploadResource, 0, bufferSize);
 		m_pCommandList->ResourceBarrier(1, &AFTER_BARRIER);

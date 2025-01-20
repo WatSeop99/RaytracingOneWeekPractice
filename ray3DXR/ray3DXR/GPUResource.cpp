@@ -41,10 +41,7 @@ bool ConstantBuffer::Initialize(ID3D12Device5* pDevice, UINT dataSize, const voi
 		return false;
 	}
 
-	if (pDATA)
-	{
-		memcpy(m_pMappedResource, m_pMemData, dataSize);
-	}
+	Upload();
 
 	return true;
 }
@@ -72,6 +69,7 @@ bool ConstantBuffer::Cleanup()
 bool ConstantBuffer::Upload()
 {
 	_ASSERT(m_pMappedResource);
+	_ASSERT(m_pMemData);
 
 	memcpy(m_pMappedResource, m_pMemData, m_DataSize);
 
@@ -123,10 +121,7 @@ bool StructuredBuffer::Initialize(ID3D12Device5* pDevice, UINT sizePerData, UINT
 		return false;
 	}
 
-	if (pDATA)
-	{
-		memcpy(m_pMappedResource, m_pMemData, sizePerData * numData);
-	}
+	Upload();
 
 	return true;
 }
@@ -148,6 +143,9 @@ bool StructuredBuffer::Cleanup()
 
 bool StructuredBuffer::Upload()
 {
+	_ASSERT(m_pMappedResource);
+	_ASSERT(m_pMemData);
+
 	memcpy(m_pMappedResource, m_pMemData, m_BufferSize);
 
 	return true;
