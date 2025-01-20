@@ -118,7 +118,7 @@ public:
 	inline BottomLevelAccelerationStructure& GetBottomLevelAS(const WCHAR* pszNAME) { return m_BottomLevelASs[pszNAME]; }
 	inline ID3D12Resource* GetTopLevelResource() { return m_TopLevelAS.GetResource(); }
 	inline UINT64 GetASMemoryFootprint() { return m_ASMemoryFootprint; }
-	inline UINT GetNumberOfBottomLevelASInstances() { return m_pBottomLevelASInstanceDescs->GetNumData(); }
+	UINT GetNumberOfBottomLevelASInstances();
 	UINT GetMaxInstanceContributionToHitGroupIndex();
 
 private:

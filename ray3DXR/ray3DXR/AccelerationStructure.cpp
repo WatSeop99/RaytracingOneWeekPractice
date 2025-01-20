@@ -394,6 +394,12 @@ bool AccelerationStructureManager::Build(ID3D12GraphicsCommandList4* pCommandLis
 	return true;
 }
 
+UINT AccelerationStructureManager::GetNumberOfBottomLevelASInstances()
+{
+	_ASSERT(m_pBottomLevelASInstanceDescs);
+	return m_pBottomLevelASInstanceDescs->GetNumData();
+}
+
 UINT AccelerationStructureManager::GetMaxInstanceContributionToHitGroupIndex()
 {
 	UINT maxInstanceContributionToHitGroupIndex = 0;

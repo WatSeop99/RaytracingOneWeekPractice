@@ -61,7 +61,7 @@ public:
 	Sphere() = default;
 	~Sphere() { --ms_SphereCount; }
 
-	bool Initialize(Application* pApp, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM);
+	bool Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM);
 
 private:
 	static UINT ms_SphereCount;

@@ -229,7 +229,86 @@ bool Box::Initialize(Application* pApp, float width, float height, float depth, 
 	return pASManager->AddBottomLevelASInstance(L"Box", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
 }
 
-bool Sphere::Initialize(Application* pApp, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
 {
-	return false;
+	_ASSERT(pApp);
+	_ASSERT(radius > 0.0f);
+	_ASSERT(materialID != UINT_MAX);
+
+	m_pApp = pApp;
+	m_MaterialID = materialID;
+	m_Radius = radius;
+
+
+	if (ms_SphereCount == 0)
+	{
+		const int NUM_SLICES = 30;
+		const int NUM_STACKS = 30;
+
+		const float D_THETA = -DirectX::XM_2PI / (float)NUM_SLICES;
+		const float D_PHI = -DirectX::XM_PI / (float)NUM_STACKS;
+
+		Vertex vertices[(NUM_STACKS + 1) * (NUM_SLICES + 1)];
+		UINT indices[NUM_SLICES * NUM_STACKS * 6];
+
+		for (int j = 0; j <= NUM_STACKS; ++j)
+		{
+			// 스택에 쌓일 수록 시작점을 x-y 평면에서 회전 시켜서 위로 올리는 구조
+			DirectX::XMFLOAT3 start(0.0f, -m_Radius, 0.0f);
+			DirectX::XMFLOAT4X4 mat;
+			DirectX::XMStoreFloat4x4(&mat, DirectX::XMMatrixRotationZ(D_PHI * j));
+			DirectX::XMVECTOR stackStartPoint = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&start), DirectX::XMLoadFloat4x4(&mat));
+			
+			for (int i = 0; i <= NUM_SLICES; ++i)
+			{
+				Vertex& v = vertices[j * (NUM_SLICES + 1) + i];
+
+				DirectX::XMVECTOR temp;
+				DirectX::XMFLOAT4X4 tempMat;
+
+				// 시작점을 x-z 평면에서 회전시키면서 원을 만드는 구조.
+				DirectX::XMStoreFloat4x4(&mat, DirectX::XMMatrixRotationY(D_THETA * (float)i));
+				temp = DirectX::XMVector3Transform(stackStartPoint, DirectX::XMLoadFloat4x4(&mat));
+				DirectX::XMStoreFloat3(&v.Position, temp);
+
+				v.Normal = v.Position; // 원점이 구의 중심.
+				temp = DirectX::XMLoadFloat3(&v.Normal);
+				temp = DirectX::XMVector3Normalize(temp);
+				DirectX::XMStoreFloat3(&v.Normal, temp);
+
+				v.TexCoord = DirectX::XMFLOAT2((float)i / NUM_SLICES, 1.0f - (float)j / NUM_STACKS);
+				/*temp = DirectX::XMLoadFloat2(&v.TexCoord);
+				temp = DirectX::XMVectorMultiply(temp, DirectX::XMVectorReplicate(1.0f));
+				DirectX::XMStoreFloat2(&v.TexCoord, temp);*/
+			}
+		}
+
+		int pushIndex = 0;
+		for (int j = 0; j < NUM_STACKS; ++j)
+		{
+			const int OFFSET = (NUM_SLICES + 1) * j;
+
+			for (int i = 0; i < NUM_SLICES; ++i)
+			{
+				indices[pushIndex++] = OFFSET + i;
+				indices[pushIndex++] = OFFSET + i + NUM_SLICES + 1;
+				indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
+
+				indices[pushIndex++] = OFFSET + i;
+				indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
+				indices[pushIndex++] = OFFSET + i + 1;
+			}
+		}
+		_ASSERT(pushIndex == NUM_SLICES * NUM_STACKS * 6);
+
+		if (!Object::Initialize(L"Sphere", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		{
+			return false;
+		}
+	}
+	++ms_SphereCount;
+
+	// Set bottom-level instance.
+	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	return pASManager->AddBottomLevelASInstance(L"Sphere", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
 }
