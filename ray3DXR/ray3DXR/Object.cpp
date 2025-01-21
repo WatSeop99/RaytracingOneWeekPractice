@@ -95,7 +95,7 @@ bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex
 		return false;
 	}
 
-	ObjectCommonCB initData = { m_MaterialID, FALSE };
+	ObjectCommonCB initData = { m_MaterialID, FALSE, };
 	return m_pConstantBuffer->Initialize(pDevice, sizeof(ObjectCommonCB), &initData);
 }
 
@@ -255,9 +255,7 @@ bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const 
 		{
 			// 스택에 쌓일 수록 시작점을 x-y 평면에서 회전 시켜서 위로 올리는 구조
 			DirectX::XMFLOAT3 start(0.0f, -m_Radius, 0.0f);
-			DirectX::XMFLOAT4X4 mat;
-			DirectX::XMStoreFloat4x4(&mat, DirectX::XMMatrixRotationZ(D_PHI * j));
-			DirectX::XMVECTOR stackStartPoint = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&start), DirectX::XMLoadFloat4x4(&mat));
+			DirectX::XMVECTOR stackStartPoint = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&start), DirectX::XMMatrixRotationZ(D_PHI * j));
 			
 			for (int i = 0; i <= NUM_SLICES; ++i)
 			{
@@ -267,8 +265,7 @@ bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const 
 				DirectX::XMFLOAT4X4 tempMat;
 
 				// 시작점을 x-z 평면에서 회전시키면서 원을 만드는 구조.
-				DirectX::XMStoreFloat4x4(&mat, DirectX::XMMatrixRotationY(D_THETA * (float)i));
-				temp = DirectX::XMVector3Transform(stackStartPoint, DirectX::XMLoadFloat4x4(&mat));
+				temp = DirectX::XMVector3Transform(stackStartPoint, DirectX::XMMatrixRotationY(D_THETA * (float)i));
 				DirectX::XMStoreFloat3(&v.Position, temp);
 
 				v.Normal = v.Position; // 원점이 구의 중심.
