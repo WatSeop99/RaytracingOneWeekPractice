@@ -1,57 +1,24 @@
-struct ObjectConstants
-{
-    uint MaterialID;
-    bool bAnimated;
-    
-    float dummy[2];
-};
+#ifndef PARAM_HLSL
+#define PARAM_HLSL
 
-struct Material
-{
-    int MatType;
-    float3 Color;
-    float Fuzz;
-    float RefractionIndex;
+#include "CommonDefine.hlsli"
 
-    float dummy[2];
-};
-struct MaterialCB
-{
-    uint MaterialID;
-    float dummy[3];
-};
+///////////////////////// Global resource ///////////////////////// 
 
-struct Vertex
-{
-    float3 Position;
-    float3 Normal;
-    float2 TexCoord;
-};
+ConstantBuffer<Scene> g_SceneCB : register(c0);
 
-struct Ray
-{
-    float3 Origin;
-    float3 Direction;
-};
+RaytracingAccelerationStructure g_RtScene : register(t0);
+StructuredBuffer<Material> g_Materials : register(t1);
 
-struct Payload
-{
-    float3 Color;
-    float3 HitPoint;
-    uint RayRecursionDepth;
-    float tHit;
-};
-struct ScatterPayload
-{
-    float3 Attenuation;
-    float PDF;
-    Ray SkipPDFRay;
-    bool bSkipPDF;
-};
+RWTexture2D<float4> g_Output : register(u0);
 
-#define MATEIRAL_NONE 0
-#define MATERIAL_LAMBERTIAN 1
-#define MATERIAL_METAL 2
-#define MATERIAL_DIELECTRIC 3
-#define MATERIAL_DIFFUSELIGHT 4
+///////////////////////// Local resource ///////////////////////// 
 
+ConstantBuffer<MaterialCB> l_MaterialCB : register(c0, space1);
+
+StructuredBuffer<uint> l_Indices : register(t0, space1);
+StructuredBuffer<Vertex> l_Vertices : register(t1, space1);
+
+//////////////////////////////////////////////////////////////////
+
+#endif

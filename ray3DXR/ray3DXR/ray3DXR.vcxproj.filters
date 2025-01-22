@@ -131,10 +131,13 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Common.hlsli">
+    <None Include="CommonDefine.hlsli">
       <Filter>Shader Files</Filter>
     </None>
     <None Include="Util.hlsli">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="Common.hlsli">
       <Filter>Shader Files</Filter>
     </None>
   </ItemGroup>
@@ -142,7 +145,13 @@
     <FxCompile Include="Shader.hlsl">
       <Filter>Shader Files</Filter>
     </FxCompile>
-    <FxCompile Include="MaterialUtil.hlsl">
+    <FxCompile Include="MaterialUtil.hlsli">
+      <Filter>Shader Files</Filter>
+    </FxCompile>
+    <FxCompile Include="RaytracingUtil.hlsli">
+      <Filter>Shader Files</Filter>
+    </FxCompile>
+    <FxCompile Include="PDFUtil.hlsli">
       <Filter>Shader Files</Filter>
     </FxCompile>
   </ItemGroup>
