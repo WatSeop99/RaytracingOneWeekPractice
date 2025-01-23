@@ -3,11 +3,12 @@
 
 struct Scene
 {
-    float3 CaemraPos;
+    float3 CameraPos;
     float4x4 Projection;
     float4x4 InverseProjection;
     float MaxRayRecursionDepth;
     float SceneTime;
+    uint LightCount;
 };
 
 struct ObjectConstants
@@ -16,6 +17,15 @@ struct ObjectConstants
     bool bAnimated;
     
     float dummy[2];
+};
+
+struct LightSource
+{
+    float3 Center;
+    uint LightGeomType; // quad or sphere.
+    float Width; // for quad light source.
+    float Height; // for quad light source.
+    float Radius; // for sphere light source.
 };
 
 struct Material
@@ -60,6 +70,7 @@ struct Payload
     float3 HitTangent;
     float RayTime;
     uint RayRecursionDepth;
+    uint2 DTID;
 };
 struct HitFoundPayload
 {
@@ -82,5 +93,10 @@ struct ScatterPayload
 #define MATERIAL_METAL 2
 #define MATERIAL_DIELECTRIC 3
 #define MATERIAL_DIFFUSELIGHT 4
+
+
+#define LIGHT_GEOM_TYPE_QUAD 1
+#define LIGHT_GEOM_TYPE_SPHERE 2
+
 
 #endif

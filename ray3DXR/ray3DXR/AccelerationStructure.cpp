@@ -179,6 +179,7 @@ bool TopLevelAccelerationStructure::Initialize(ID3D12Device5* pDevice, UINT numB
 {
 	_ASSERT(pDevice);
 	_ASSERT(pszResourceName);
+	_ASSERT(numBottomLevelASInstanceDescs > 0);
 
 	m_bAllowUpdate = bAllowUpdate;
 	m_bUpdateOnBuild = bUpdateOnBuild;
@@ -233,6 +234,7 @@ bool TopLevelAccelerationStructure::Build(ID3D12GraphicsCommandList4* pCommandLi
 void TopLevelAccelerationStructure::ComputePrebuildInfo(ID3D12Device5* pDevice, UINT numBottomLevelASInstanceDescs)
 {
 	_ASSERT(pDevice);
+	_ASSERT(numBottomLevelASInstanceDescs > 0);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelBuildDesc.Inputs;
@@ -248,12 +250,13 @@ void TopLevelAccelerationStructure::ComputePrebuildInfo(ID3D12Device5* pDevice, 
 	}
 }
 
-bool AccelerationStructureManager::Initialize(ID3D12Device5* pDevice, UINT numBottomLevelInstances)
+bool AccelerationStructureManager::Initialize(Application* pApp, UINT maxNumBottomLevelInstances)
 {
-	_ASSERT(pDevice);
+	_ASSERT(pApp);
+	_ASSERT(maxNumBottomLevelInstances > 0);
 
 	m_pBottomLevelASInstanceDescs = new StructuredBuffer;
-	return m_pBottomLevelASInstanceDescs->Initialize(pDevice, sizeof(D3D12_RAYTRACING_INSTANCE_DESC), numBottomLevelInstances, nullptr);
+	return m_pBottomLevelASInstanceDescs->Initialize(pApp, sizeof(D3D12_RAYTRACING_INSTANCE_DESC), maxNumBottomLevelInstances, nullptr);
 }
 
 bool AccelerationStructureManager::Cleanup()
@@ -309,9 +312,9 @@ bool AccelerationStructureManager::AddBottomLevelAS(ID3D12Device5* pDevice, D3D1
 	return true;
 }
 
-UINT AccelerationStructureManager::AddBottomLevelASInstance(const WCHAR* pszBottomLevelASname, UINT instanceContributionToHitGroupIndex, DirectX::XMMATRIX transform, BYTE instanceMask)
+UINT AccelerationStructureManager::AddBottomLevelASInstance(const WCHAR* pszBottomLevelASName, UINT instanceContributionToHitGroupIndex, DirectX::XMMATRIX transform, BYTE instanceMask)
 {
-	_ASSERT(pszBottomLevelASname);
+	_ASSERT(pszBottomLevelASName);
 
 	if (m_NumBottomLevelASInstances >= m_pBottomLevelASInstanceDescs->GetNumData())
 	{
@@ -320,7 +323,7 @@ UINT AccelerationStructureManager::AddBottomLevelASInstance(const WCHAR* pszBott
 	}
 
 	UINT instanceIndex = m_NumBottomLevelASInstances++;
-	BottomLevelAccelerationStructure& bottomLevelAS = m_BottomLevelASs[pszBottomLevelASname];
+	BottomLevelAccelerationStructure& bottomLevelAS = m_BottomLevelASs[pszBottomLevelASName];
 
 	D3D12_RAYTRACING_INSTANCE_DESC* pInstanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)m_pBottomLevelASInstanceDescs->GetDataMem();
 	D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = pInstanceDescs[instanceIndex];

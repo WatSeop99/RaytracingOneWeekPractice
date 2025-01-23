@@ -37,6 +37,7 @@ public:
 	Material() = default;
 	virtual ~Material() { Cleanup(); }
 
+	bool Initialize(Application* pApp);
 	virtual bool Cleanup();
 
 	virtual void SetMaterialID(UINT materialID);

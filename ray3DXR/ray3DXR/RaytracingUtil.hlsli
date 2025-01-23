@@ -31,12 +31,13 @@ Ray GenerateCameraRay(in uint2 index, in float3 cameraPosition, in float4x4 inve
     return ray;
 }
 
-Payload TraceRadianceRay(in Ray ray, in uint curRayRecursion, in float tMin, in float tMax)
+Payload TraceRadianceRay(in Ray ray, in uint curRayRecursion, in float tMin, in float tMax, in uint2 dtID)
 {
     Payload payload;
     payload.Color = float3(0.0f, 0.0f, 0.0f);
     payload.RayRecursionDepth = curRayRecursion;
-    payload.RayTime = 0.0f;
+    payload.RayTime = -1.0f;
+    payload.DTID = dtID;
     
     if (curRayRecursion >= g_SceneCB.MaxRayRecursionDepth)
     {
@@ -60,6 +61,7 @@ HitFoundPayload TraceNormalHit(in Ray ray, in float tMin, in float tMax)
     payload.HitPoint = float3(0.0f, 0.0f, 0.0f);
     payload.HitNormal = float3(0.0f, 0.0f, 0.0f);
     payload.HitTangent = float3(0.0f, 0.0f, 0.0f);
+    payload.RayTime = -1.0f;
     
     RayDesc rayDesc;
     rayDesc.Origin = ray.Origin;
@@ -67,7 +69,7 @@ HitFoundPayload TraceNormalHit(in Ray ray, in float tMin, in float tMax)
     rayDesc.TMin = tMin;
     rayDesc.TMax = tMax;
     
-    TraceRay(g_RtScene, 0, 0xFF, 1, 0, 1, rayDesc, payload);
+    TraceRay(g_RtLightScene, 0, 0xFF, 1, 0, 1, rayDesc, payload);
     
     return payload;
 }

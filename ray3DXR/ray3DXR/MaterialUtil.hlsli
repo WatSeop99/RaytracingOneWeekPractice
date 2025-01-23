@@ -1,8 +1,8 @@
 #ifndef MATERIAL_HLSL
 #define MATERIAL_HLSL
 
+#include "PDFUtil.hlsli"
 #include "Util.hlsli"
-#include "PDFUtil.hlsl"
 
 float Reflectance(in float cosine, in float refractionIndex)
 {
@@ -41,7 +41,7 @@ bool IsScatter(in Material mat, in Ray ray, in Payload payload, in uint hitKind,
         case MATERIAL_METAL:
 			{
                 float3 reflected = reflect(ray.Direction, payload.HitNormal);
-                reflected = normalize(reflected) + (mat.Fuzz * GetRandomUnitVector());
+                reflected = normalize(reflected) + (mat.Fuzz * GetRandomUnitVector(payload.DTID));
 			
                 scatterPayload.Attenuation = mat.Color;
                 scatterPayload.bSkipPDF = true;
@@ -64,7 +64,7 @@ bool IsScatter(in Material mat, in Ray ray, in Payload payload, in uint hitKind,
 			
                 bool bCannotRefract = (ri * sinTheta > 1.0f);
                 float3 direction;
-                if (bCannotRefract || Reflectance(cosTheta, ri) > GetRandomFloatValue())
+                if (bCannotRefract || Reflectance(cosTheta, ri) > GetRandomFloatValue(payload.DTID))
                 {
                     direction = reflect(unitDir, payload.HitNormal);
                 }

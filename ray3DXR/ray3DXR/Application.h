@@ -129,16 +129,22 @@ struct PipelineConfig
 	D3D12_STATE_SUBOBJECT SubObject;
 };
 
-static const WCHAR* pszRAY_GEN_SHADER = L"RayGen";
+static const WCHAR* pszRAY_GEN_SHADER = L"RayGeneration";
+static const WCHAR* pszCLOSEST_HIT_RADIANCE_SHADER = L"ClosestHitForRadianceRay";
+static const WCHAR* pszCLOSEST_HIT_PDF_SHADER = L"ClosestHitForPDFRay";
+static const WCHAR* pszMISS_RADIANCE_SHADER = L"MissRadiance";
+static const WCHAR* pszMISS_PDF_SHADER = L"MissPDF";
+
 static const WCHAR* pszMISS_SHADER = L"Miss";
 static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
-static const WCHAR* pszHIT_GROUP = L"HitGroup";
+static const WCHAR* pszHIT_GROUP[] = { L"HitGroupRadiance", L"hitGroupPDF" };
 
 class AccelerationStructureManager;
 class DescriptorAllocator;
-class Material;
+class MaterialManager;
 class ResourceManager;
 class TextureManager;
+class Object;
 
 class Application final : public BaseForm
 {
@@ -163,9 +169,10 @@ public:
 	inline ResourceManager* GetResourceManager() { return m_pResourceManager; }
 	inline TextureManager* GetTextureManager() { return m_pTextureManager; }
 	inline AccelerationStructureManager* GetASManager() { return m_pAccelerationStructureManager; }
+	inline AccelerationStructureManager* GetLightASManager() { return m_pLightAccelerationStructureManager; }
+	inline MaterialManager* GetMaterialManager() { return m_pMaterialManager; }
 	inline DescriptorAllocator* GetRTVAllocator() { return m_pRTVAllocator; }
 	inline DescriptorAllocator* GetCBVSRVUAVAllocator() { return m_pCBVSRVUAVAllocator; }
-	inline std::vector<Material*>& GetMaterials() { return m_Materials; }
 
 private:
 	void InitDXR();
@@ -191,6 +198,8 @@ private:
 	ID3D12RootSignature* CreateRootSignature(ID3D12Device5* pDevice, const D3D12_ROOT_SIGNATURE_DESC& DESC);
 
 	DXILLibrary CreateDXILLibrary();
+	bool CreateDXILLibrarySubObjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
+	bool CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
 	RootSignatureDesc CreateRayGenRootDesc();
 	ID3DBlob* CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* pszTARGET_STRING);
 
@@ -228,9 +237,12 @@ private:
 	ResourceManager* m_pResourceManager = nullptr;
 	TextureManager* m_pTextureManager = nullptr;
 	AccelerationStructureManager* m_pAccelerationStructureManager = nullptr;
+	AccelerationStructureManager* m_pLightAccelerationStructureManager = nullptr;
+	MaterialManager* m_pMaterialManager = nullptr;
 
 	DescriptorAllocator* m_pRTVAllocator = nullptr;
 	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;
 
-	std::vector<Material*> m_Materials;
+	std::vector<Object*> m_Objects;
+	std::vector<Object*> m_Lights;
 };

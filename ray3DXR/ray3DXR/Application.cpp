@@ -1,7 +1,10 @@
 #include "framework.h"
+#include "AccelerationStructure.h"
 #include "CommonDefine.h"
 #include "DescriptorAllocator.h"
 #include "DxcDLLSupport.h"
+#include "Material.h"
+#include "Object.h"
 #include "ResourceManager.h"
 #include "TextureManager.h"
 #include "Application.h"
@@ -151,6 +154,18 @@ void Application::OnShutdown()
 	UINT64 lastFenceValue = Fence();
 	WaitForGPU(lastFenceValue);
 
+	for (SIZE_T i = 0, size = m_Objects.size(); i < size; ++i)
+	{
+		delete m_Objects[i];
+	}
+	m_Objects.clear();
+
+	for (SIZE_T i = 0, size = m_Lights.size(); i < size; ++i)
+	{
+		delete m_Lights[i];
+	}
+	m_Lights.clear();
+
 	if (m_pResourceManager)
 	{
 		delete m_pResourceManager;
@@ -160,6 +175,21 @@ void Application::OnShutdown()
 	{
 		delete m_pTextureManager;
 		m_pTextureManager = nullptr;
+	}
+	if (m_pAccelerationStructureManager)
+	{
+		delete m_pAccelerationStructureManager;
+		m_pAccelerationStructureManager = nullptr;
+	}
+	if (m_pLightAccelerationStructureManager)
+	{
+		delete m_pLightAccelerationStructureManager;
+		m_pLightAccelerationStructureManager = nullptr;
+	}
+	if (m_pMaterialManager)
+	{
+		delete m_pMaterialManager;
+		m_pMaterialManager = nullptr;
 	}
 
 	m_pCBVSRVUAVHeap->Release();
@@ -302,6 +332,15 @@ void Application::InitDXR()
 	m_pTextureManager = new TextureManager;
 	m_pTextureManager->Initialize(this);
 
+	m_pAccelerationStructureManager = new AccelerationStructureManager;
+	m_pAccelerationStructureManager->Initialize(this, 100);
+
+	m_pLightAccelerationStructureManager = new AccelerationStructureManager;
+	m_pLightAccelerationStructureManager->Initialize(this, 10);
+
+	m_pMaterialManager = new MaterialManager;
+	m_pMaterialManager->Initialize(this, 20);
+
 	m_pRTVAllocator = new DescriptorAllocator;
 	m_pRTVAllocator->Initialize(m_pDevice, 5, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_pCBVSRVUAVAllocator = new DescriptorAllocator;
@@ -356,28 +395,172 @@ void Application::EndFrame()
 
 void Application::CreateAccelerationStructures()
 {
-	m_pVertexBuffer = CreateTriangleVB(m_pDevice);
-	if (!m_pVertexBuffer)
+	//m_pVertexBuffer = CreateTriangleVB(m_pDevice);
+	//if (!m_pVertexBuffer)
+	//{
+	//	__debugbreak();
+	//}
+
+	//AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(m_pDevice, m_pCommandList, m_pVertexBuffer);
+	//AccelerationStructureBuffers topLevelBuffers = CreateTopLevelAS(m_pDevice, m_pCommandList, bottomLevelBuffers.pResult, &m_TlasSize);
+
+	//// The tutorial doesn't have any resource lifetime management, so we flush and sync here. This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
+	//UINT64 lastFenceValue = SubmitCommandList();
+	//WaitForGPU(lastFenceValue);
+
+	//m_pCommandList->Reset(m_FrameObjects[0].pCommandAllocator, nullptr);
+
+	//// Store the AS buffers. The rest of the buffers will be released once we exit the function
+	//m_pTopLevelAS = topLevelBuffers.pResult;
+	//m_pBottomLevelAS = bottomLevelBuffers.pResult;
+
+	//bottomLevelBuffers.pScratch->Release();
+	//topLevelBuffers.pScratch->Release();
+	//topLevelBuffers.pInstanceDesc->Release();
+
+
+
+
+	if (FAILED(m_FrameObjects[0].pCommandAllocator->Reset()))
+	{
+		__debugbreak();
+	}
+	if (FAILED(m_pCommandList->Reset(m_FrameObjects[0].pCommandAllocator, nullptr)))
 	{
 		__debugbreak();
 	}
 
-	AccelerationStructureBuffers bottomLevelBuffers = CreateBottomLevelAS(m_pDevice, m_pCommandList, m_pVertexBuffer);
-	AccelerationStructureBuffers topLevelBuffers = CreateTopLevelAS(m_pDevice, m_pCommandList, bottomLevelBuffers.pResult, &m_TlasSize);
 
-	// The tutorial doesn't have any resource lifetime management, so we flush and sync here. This is not required by the DXR spec - you can submit the list whenever you like as long as you take care of the resources lifetime.
-	UINT64 lastFenceValue = SubmitCommandList();
-	WaitForGPU(lastFenceValue);
+	Material* pEmptyMat = new Material;
+	Lambertian* pRed = new Lambertian;
+	Lambertian* pGreen = new Lambertian;
+	Lambertian* pWhite = new Lambertian;
+	DiffuseLight* pLight = new DiffuseLight;
+	Dielectric* pGlass = new Dielectric;
+	pEmptyMat->Initialize(this);
+	pRed->Initialize(this, DirectX::XMFLOAT3(0.65f, 0.05f, 0.05f));
+	pGreen->Initialize(this, DirectX::XMFLOAT3(0.12f, 0.45f, 0.15f));
+	pWhite->Initialize(this, DirectX::XMFLOAT3(0.73f, 0.73f, 0.73f));
+	pLight->Initialize(this, DirectX::XMFLOAT3(15.0f, 15.0f, 15.0f));
+	pGlass->Initialize(this, 1.5f);
 
-	m_pCommandList->Reset(m_FrameObjects[0].pCommandAllocator, nullptr);
+	m_pMaterialManager->AddMaterial(pEmptyMat);
+	m_pMaterialManager->AddMaterial(pRed);
+	m_pMaterialManager->AddMaterial(pGreen);
+	m_pMaterialManager->AddMaterial(pWhite);
+	m_pMaterialManager->AddMaterial(pLight);
+	
+	Quad* pRightPannel = new Quad;
+	Quad* pLeftPannel = new Quad;
+	Quad* pBackPannel = new Quad;
+	Quad* pUpPannel = new Quad;
+	Quad* pDownPannel = new Quad;
+	Box* pBox = new Box;
+	Sphere* pSphere = new Sphere;
 
-	// Store the AS buffers. The rest of the buffers will be released once we exit the function
-	m_pTopLevelAS = topLevelBuffers.pResult;
-	m_pBottomLevelAS = bottomLevelBuffers.pResult;
+	DirectX::XMFLOAT4X4 rightMat;
+	DirectX::XMFLOAT4X4 leftMat;
+	DirectX::XMFLOAT4X4 backMat;
+	DirectX::XMFLOAT4X4 upMat;
+	DirectX::XMFLOAT4X4 downMat;
+	DirectX::XMFLOAT4X4 boxMat;
+	DirectX::XMFLOAT4X4 sphereMat;
 
-	bottomLevelBuffers.pScratch->Release();
-	topLevelBuffers.pScratch->Release();
-	topLevelBuffers.pInstanceDesc->Release();
+	DirectX::XMMATRIX temp;
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationY(-90.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(555.0f, 555.0f * 0.5f, 555.0f * 0.5f));
+	DirectX::XMStoreFloat4x4(&rightMat, temp);
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationY(90.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(0.0f, 555.0f * 0.5f, 555.0f * 0.5f));
+	DirectX::XMStoreFloat4x4(&leftMat, temp);
+	temp = DirectX::XMMatrixTranslation(0.0f, 0.0f, 555.0f);
+	DirectX::XMStoreFloat4x4(&backMat, temp);
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationX(-90.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(555.0f * 0.5f, 555.0f, 555.0f * 0.5f));
+	DirectX::XMStoreFloat4x4(&upMat, temp);
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationX(90.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(555.0f * 0.5f, 0.0f, 555.0f * 0.5f));
+	DirectX::XMStoreFloat4x4(&downMat, temp);
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationY(-15.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(265.0f, 0.0f, 295.0f));
+	DirectX::XMStoreFloat4x4(&boxMat, temp);
+	temp = DirectX::XMMatrixTranslation(190.0f, 90.0f, 190.0f);
+	DirectX::XMStoreFloat4x4(&sphereMat, temp);
+
+	if (!pRightPannel->Initialize(this, 555.0f, 555.0f, pGreen->GetMaterialID(), rightMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pRightPannel);
+	if (!pLeftPannel->Initialize(this, 555.0f, 555.0f, pRed->GetMaterialID(), leftMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pLeftPannel);
+	if (!pBackPannel->Initialize(this, 555.0f, 555.0f, pWhite->GetMaterialID(), backMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pBackPannel);
+	if (!pUpPannel->Initialize(this, 555.0f, 555.0f, pWhite->GetMaterialID(), upMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pUpPannel);
+	if (!pDownPannel->Initialize(this, 555.0f, 555.0f, pWhite->GetMaterialID(), downMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pDownPannel);
+	if (!pBox->Initialize(this, 165.0f, 330.0f, 165.0f, pWhite->GetMaterialID(), boxMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pBox);
+	if (!pSphere->Initialize(this, 90.0f, pGlass->GetMaterialID(), sphereMat))
+	{
+		__debugbreak();
+	}
+	m_Objects.push_back(pSphere);
+	
+	if (!m_pAccelerationStructureManager->InitializeTopLevelAS(m_pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE, false, false, L"TopLevelAS"))
+	{
+		__debugbreak();
+	}
+
+	if (!m_pAccelerationStructureManager->Build(m_pCommandList, m_pCBVSRVUAVAllocator->GetDescriptorHeap(), m_FrameIndex))
+	{
+		__debugbreak();
+	}
+
+
+	Quad* pQuadLight = new Quad;
+	Sphere* pSphereLight = new Sphere;
+
+	DirectX::XMFLOAT4X4 quadLightMat;
+	DirectX::XMFLOAT4X4 sphereLightMat;
+	temp = DirectX::XMMatrixMultiply(DirectX::XMMatrixRotationX(-90.0f * DirectX::XM_PI / 180.0f), DirectX::XMMatrixTranslation(228.0f, 554.0f, 279.5f));
+	DirectX::XMStoreFloat4x4(&quadLightMat, temp);
+	temp = DirectX::XMMatrixTranslation(190.0f, 90.0f, 190.0f);
+	DirectX::XMStoreFloat4x4(&sphereLightMat, temp);
+
+	if (!pQuadLight->Initialize(this, 130.0f, 105.0f, pEmptyMat->GetMaterialID(), quadLightMat, true))
+	{
+		__debugbreak();
+	}
+	m_Lights.push_back(pQuadLight);
+	if (!pSphereLight->Initialize(this, 90.0f, pEmptyMat->GetMaterialID(), sphereLightMat, true))
+	{
+		__debugbreak();
+	}
+	m_Lights.push_back(pSphereLight);
+
+	if (!m_pLightAccelerationStructureManager->InitializeTopLevelAS(m_pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE, false, false, L"LightTopLevelAS"))
+	{
+		__debugbreak();
+	}
+	if (!m_pLightAccelerationStructureManager->Build(m_pCommandList, m_pCBVSRVUAVAllocator->GetDescriptorHeap(), m_FrameIndex))
+	{
+		__debugbreak();
+	}
+
+	UINT64 fenceValue = SubmitCommandList();
+	WaitForGPU(fenceValue);
 }
 
 void Application::CreateRTPipelineState()
@@ -399,7 +582,7 @@ void Application::CreateRTPipelineState()
 	DXILLibrary dxilLib = CreateDXILLibrary();
 	subObjects[index++] = dxilLib.StateSubObject; // 0 Library
 
-	HitProgram hitProgram(nullptr, pszCLOSEST_HIT_SHADER, pszHIT_GROUP);
+	HitProgram hitProgram(nullptr, pszCLOSEST_HIT_SHADER, pszHIT_GROUP[0]);
 	subObjects[index++] = hitProgram.SubObject; // 1 Hit Group
 
 	// Create the ray-gen root-signature and association
@@ -449,6 +632,22 @@ void Application::CreateRTPipelineState()
 	if (FAILED(hr))
 	{
 		__debugbreak();
+	}
+
+
+
+
+
+	CD3DX12_STATE_OBJECT_DESC raytracingPipelineDesc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
+
+	if (!CreateDXILLibrarySubObjects(&raytracingPipelineDesc))
+	{
+		__debugbreak();
+	}
+
+	if (!CreateHitGroupSubobjects(&raytracingPipelineDesc))
+	{
+
 	}
 }
 
@@ -857,6 +1056,37 @@ DXILLibrary Application::CreateDXILLibrary()
 	return DXILLibrary(pDXILLib, pszENTRY_POINTS, _countof(pszENTRY_POINTS));
 }
 
+bool Application::CreateDXILLibrarySubObjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc)
+{
+	_ASSERT(pRaytracingPipelineDesc);
+
+	CD3DX12_DXIL_LIBRARY_SUBOBJECT* pLib = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+	if (!pLib)
+	{
+		return false;
+	}
+
+	ID3DBlob* pShaderCode = CompileLibrary(L"Shader.hlsl", L"lib_6_3");
+	if (!pShaderCode)
+	{
+		return false;
+	}
+	
+	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)pShaderCode->GetBufferPointer(), pShaderCode->GetBufferSize());
+	pLib->SetDXILLibrary(&libdxil);
+
+	return true;
+}
+
+bool Application::CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc)
+{
+	_ASSERT(pRaytracingPipelineDesc);
+
+	// ? hitgroup어지럽네..
+
+	return false;
+}
+
 RootSignatureDesc Application::CreateRayGenRootDesc()
 {
 	RootSignatureDesc desc = {};
@@ -978,11 +1208,10 @@ UINT64 Application::SubmitCommandList()
 {
 	_ASSERT(m_pCommandList);
 	_ASSERT(m_pCommandQueue);
-	_ASSERT(m_pFence);
 
 	m_pCommandList->Close();
 
-	ID3D12CommandList* ppCommandLists[] = { m_pCommandList, };
+	ID3D12CommandList* ppCommandLists[] = { m_pCommandList };
 	m_pCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	return Fence();

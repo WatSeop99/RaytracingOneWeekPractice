@@ -11,7 +11,7 @@ UINT Quad::ms_QuadCount = 0;
 UINT Box::ms_BoxCount = 0;
 UINT Sphere::ms_SphereCount = 0;
 
-bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES)
+bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES, bool bIsLightSource)
 {
 	_ASSERT(pszNAME);
 	_ASSERT(pVERTICES);
@@ -82,7 +82,15 @@ bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex
 	}
 
 	// Add bottom-level AS.
-	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	AccelerationStructureManager* pASManager = nullptr;
+	if (bIsLightSource)
+	{
+		pASManager = m_pApp->GetLightASManager();
+	}
+	else
+	{
+		pASManager = m_pApp->GetASManager();
+	}
 	if (!pASManager->AddBottomLevelAS(pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE, m_pGeometryInfo, false, true))
 	{
 		return false;
@@ -96,7 +104,7 @@ bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex
 	}
 
 	ObjectCommonCB initData = { m_MaterialID, FALSE, };
-	return m_pConstantBuffer->Initialize(pDevice, sizeof(ObjectCommonCB), &initData);
+	return m_pConstantBuffer->Initialize(m_pApp, sizeof(ObjectCommonCB), &initData);
 }
 
 bool Object::Cleanup()
@@ -116,7 +124,7 @@ bool Object::Cleanup()
 	return true;
 }
 
-bool Quad::Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+bool Quad::Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)
 {
 	_ASSERT(pApp);
 	_ASSERT(width > 0.0f);
@@ -141,7 +149,7 @@ bool Quad::Initialize(Application* pApp, float width, float height, UINT materia
 		};
 		UINT indices[6] = { 0, 1, 2, 1, 3, 2 };
 
-		if (!Object::Initialize(L"Quad", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		if (!Object::Initialize(L"Quad", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource))
 		{
 			return false;
 		}
@@ -149,11 +157,19 @@ bool Quad::Initialize(Application* pApp, float width, float height, UINT materia
 	++ms_QuadCount;
 
 	// Set bottom-level instance.
-	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	AccelerationStructureManager* pASManager = nullptr;
+	if (bIsLightSource)
+	{
+		pASManager = m_pApp->GetLightASManager();
+	}
+	else
+	{
+		pASManager = m_pApp->GetASManager();
+	}
 	return pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
 }
 
-bool Box::Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+bool Box::Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)
 {
 	_ASSERT(pApp);
 	_ASSERT(width > 0.0f);
@@ -217,7 +233,7 @@ bool Box::Initialize(Application* pApp, float width, float height, float depth, 
 			20, 21, 22, 21, 23, 22
 		};
 
-		if (!Object::Initialize(L"Box", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		if (!Object::Initialize(L"Box", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource))
 		{
 			return false;
 		}
@@ -225,11 +241,19 @@ bool Box::Initialize(Application* pApp, float width, float height, float depth, 
 	++ms_BoxCount;
 
 	// Set bottom-level instance.
-	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	AccelerationStructureManager* pASManager = nullptr;
+	if (bIsLightSource)
+	{
+		pASManager = m_pApp->GetLightASManager();
+	}
+	else
+	{
+		pASManager = m_pApp->GetASManager();
+	}
 	return pASManager->AddBottomLevelASInstance(L"Box", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
 }
 
-bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM)
+bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)
 {
 	_ASSERT(pApp);
 	_ASSERT(radius > 0.0f);
@@ -298,7 +322,7 @@ bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const 
 		}
 		_ASSERT(pushIndex == NUM_SLICES * NUM_STACKS * 6);
 
-		if (!Object::Initialize(L"Sphere", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices))
+		if (!Object::Initialize(L"Sphere", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource))
 		{
 			return false;
 		}
@@ -306,6 +330,14 @@ bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const 
 	++ms_SphereCount;
 
 	// Set bottom-level instance.
-	AccelerationStructureManager* pASManager = m_pApp->GetASManager();
+	AccelerationStructureManager* pASManager = nullptr;
+	if (bIsLightSource)
+	{
+		pASManager = m_pApp->GetLightASManager();
+	}
+	else
+	{
+		pASManager = m_pApp->GetASManager();
+	}
 	return pASManager->AddBottomLevelASInstance(L"Sphere", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
 }

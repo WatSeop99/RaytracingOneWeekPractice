@@ -19,8 +19,12 @@ public:
 	Object() = default;
 	virtual ~Object() { Cleanup(); }
 
-	bool Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES);
+	bool Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES, bool bIsLightSource);
 	bool Cleanup();
+
+	inline BottomLevelAccelerationStructureGeometry* GetASGeometry() { return m_pGeometryInfo; }
+	inline ConstantBuffer* GetConstantBuffer() { return m_pConstantBuffer; }
+	inline UINT GetMaterialID() { return m_MaterialID; }
 
 protected:
 	BottomLevelAccelerationStructureGeometry* m_pGeometryInfo = nullptr;
@@ -37,7 +41,7 @@ public:
 	Quad() = default;
 	~Quad() { --ms_QuadCount; }
 
-	bool Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM);
+	bool Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource = false);
 
 private:
 	static UINT ms_QuadCount;
@@ -49,7 +53,7 @@ public:
 	Box() = default;
 	~Box() { --ms_BoxCount; }
 
-	bool Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM);
+	bool Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource = false);
 
 private:
 	static UINT ms_BoxCount;
@@ -61,7 +65,7 @@ public:
 	Sphere() = default;
 	~Sphere() { --ms_SphereCount; }
 
-	bool Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM);
+	bool Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource = false);
 
 private:
 	static UINT ms_SphereCount;

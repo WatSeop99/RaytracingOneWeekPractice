@@ -8,7 +8,9 @@
 ConstantBuffer<Scene> g_SceneCB : register(c0);
 
 RaytracingAccelerationStructure g_RtScene : register(t0);
-StructuredBuffer<Material> g_Materials : register(t1);
+RaytracingAccelerationStructure g_RtLightScene : register(t1);
+StructuredBuffer<Material> g_Materials : register(t2);
+StructuredBuffer<LightSource> g_LightSources : register(t3);
 
 RWTexture2D<float4> g_Output : register(u0);
 

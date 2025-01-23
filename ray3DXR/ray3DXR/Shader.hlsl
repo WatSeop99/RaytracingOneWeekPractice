@@ -5,6 +5,7 @@
 #include "Common.hlsli"
 #include "MaterialUtil.hlsli"
 #include "RaytracingUtil.hlsli"
+#include "PDFUtil.hlsli"
 
 //RaytracingAccelerationStructure g_RtScene : register(t0);
 //RWTexture2D<float4> g_Output : register(u0);
@@ -75,7 +76,7 @@ void RayGeneration()
     Ray ray = GenerateCameraRay(dtID, g_SceneCB.CameraPos, g_SceneCB.InverseProjection);
 
     uint currentRayRecursionDepth = 0;
-    Payload payload = TraceRadianceRay(ray, currentRayRecursionDepth, 0.1f, 10000.0f);
+    Payload payload = TraceRadianceRay(ray, currentRayRecursionDepth, 0.1f, 10000.0f, dtID);
     
     g_Output[dtID.xy] = payload.Color;
 }
@@ -122,7 +123,7 @@ void ClosestHitForRadianceRay(inout Payload payload, in BuiltInTriangleIntersect
     // if pdf skip, return atta * RadianceCalc
     if (scatterPayload.bSkipPDF)
     {
-        float3 skipScatterColor = TraceRadianceRay(scatterPayload.SkipPDFRay, payload.RayRecursionDepth + 1, 0.1f, 10000.0f).Color;
+        float3 skipScatterColor = TraceRadianceRay(scatterPayload.SkipPDFRay, payload.RayRecursionDepth + 1, 0.1f, 10000.0f, payload.DTID).Color;
         payload.Color = scatterPayload.Attenuation * skipScatterColor;
         return;
     }
@@ -135,13 +136,13 @@ void ClosestHitForRadianceRay(inout Payload payload, in BuiltInTriangleIntersect
     // calc scatter pdf val
     Ray scatteredRay;
     scatteredRay.Origin = hitPosition;
-    scatteredRay.Direction;
+    scatteredRay.Direction = GetMixedPDFGeneration(lightPDFOrigin, hitNormal, hitTangent, payload.DTID);
     
     float pdfValue = GetMixedPDFValue(lightPDFOrigin, scatterPayload.PDF, scatteredRay.Direction);
     float scatteringPDF = GetScatterringPDF(material, ray, payload, scatteredRay);
     
     // trace ray
-    float3 sampleColor = TraceRadianceRay(scatteredRay, payload.RayRecursionDepth + 1, 0.1f, 10000.0f).Color;
+    float3 sampleColor = TraceRadianceRay(scatteredRay, payload.RayRecursionDepth + 1, 0.1f, 10000.0f, payload.DTID).Color;
     
     // calc scatter color
     float3 scatterColor = (scatterPayload.Attenuation * scatteringPDF * sampleColor) / pdfValue;

@@ -106,7 +106,7 @@ public:
 	AccelerationStructureManager() = default;
 	~AccelerationStructureManager() { Cleanup(); }
 
-	bool Initialize(ID3D12Device5* pDevice, UINT numBottomLevelInstances);
+	bool Initialize(Application* pApp, UINT maxNumBottomLevelInstances);
 	bool Cleanup();
 
 	bool AddBottomLevelAS(ID3D12Device5* pDevice, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags, BottomLevelAccelerationStructureGeometry* pBottomLevelASGeometry, bool bAllowUpdate = false, bool bPerformUpdateOnBuild = false);

@@ -4,6 +4,21 @@
 #include "Texture.h"
 #include "Material.h"
 
+bool Material::Initialize(Application* pApp)
+{
+	_ASSERT(pApp);
+
+	m_MaterialType = MaterialType_Labmertian;
+
+	m_pConstantBuffer = new ConstantBuffer;
+	if (!m_pConstantBuffer)
+	{
+		return false;
+	}
+
+	return m_pConstantBuffer->Initialize(pApp, sizeof(MaterialConstantsData), nullptr);
+}
+
 bool Material::Cleanup()
 {
 	if (m_pConstantBuffer)
