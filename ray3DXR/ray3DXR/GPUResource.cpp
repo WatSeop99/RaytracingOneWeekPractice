@@ -196,3 +196,97 @@ bool StructuredBuffer::Upload()
 
 	return true;
 }
+
+bool ShaderTable::Initialize(Application* pApp, UINT sizePerData, UINT numData, const WCHAR* pszNAME)
+{
+	_ASSERT(pApp);
+	_ASSERT(sizePerData > 0);
+	_ASSERT(numData > 0);
+
+	m_pApp = pApp;
+	m_DataSize = (sizePerData + (D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1)) & ~(D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT - 1);
+	m_NumData = numData;
+	m_BufferSize = m_NumData * m_DataSize;
+	
+	m_pMemData = malloc(m_BufferSize);
+	if (!m_pMemData)
+	{
+		return false;
+	}
+	ZeroMemory(m_pMemData, m_BufferSize);
+
+	ID3D12Device5* pDevice = m_pApp->GetDevice();
+	CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_BufferSize);
+	HRESULT hr = pDevice->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_pResource));
+	if (FAILED(hr))
+	{
+		return false;
+	}
+
+	if (pszNAME)
+	{
+		m_pResource->SetName(pszNAME);
+	}
+
+	CD3DX12_RANGE readRange(0, 0);
+	m_pResource->Map(0, &readRange, (void**)&m_pMappedResource);
+	if (!m_pMappedResource)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool ShaderTable::Cleanup()
+{
+	if (m_pResource)
+	{
+		m_pResource->Unmap(0, nullptr);
+		m_pMappedResource = nullptr;
+
+		m_pResource->Release();
+		m_pResource = nullptr;
+	}
+	if (m_pMemData)
+	{
+		free(m_pMemData);
+		m_pMemData = nullptr;
+	}
+
+	m_BufferSize = 0;
+	m_NumData = 0;
+	m_DataSize = 0;
+	m_CurrentRecordCount = 0;
+
+	m_pApp = nullptr;
+
+	return true;
+}
+
+bool ShaderTable::Upload()
+{
+	_ASSERT(m_pMappedResource);
+	_ASSERT(m_pMemData);
+
+	memcpy(m_pMappedResource, m_pMemData, m_BufferSize);
+
+	return true;
+}
+
+void ShaderTable::PushBack(const ShaderRecord* pRECORD)
+{
+	_ASSERT(pRECORD);
+	_ASSERT(m_pMemData);
+	_ASSERT(m_CurrentRecordCount + 1 <= m_NumData);
+
+	BYTE* pDataRecord = (BYTE*)((ShaderRecord*)m_pMemData + m_CurrentRecordCount);
+	memcpy(pDataRecord, pRECORD->pShaderIdentifierPtr, pRECORD->ShaderIdentifierSize);
+	if (pRECORD->pLocalRootArgumentsPtr)
+	{
+		memcpy(pDataRecord + pRECORD->ShaderIdentifierSize, pRECORD->pLocalRootArgumentsPtr, pRECORD->LocalRootArgumentsSize);
+	}
+	
+	++m_CurrentRecordCount;
+}

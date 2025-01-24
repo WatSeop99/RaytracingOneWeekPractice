@@ -3,6 +3,7 @@
 #include "CommonDefine.h"
 #include "DescriptorAllocator.h"
 #include "DxcDLLSupport.h"
+#include "GPUResource.h"
 #include "Material.h"
 #include "Object.h"
 #include "ResourceManager.h"
@@ -196,9 +197,38 @@ void Application::OnShutdown()
 	m_pOutputResource->Release();
 
 	m_pShaderTable->Release();
+	if (m_pRaygenShaderTable)
+	{
+		m_pRaygenShaderTable->Release();
+		m_pRaygenShaderTable = nullptr;
+	}
+	if (m_pMissShaderTable)
+	{
+		m_pMissShaderTable->Release();
+		m_pMissShaderTable = nullptr;
+	}
+	if (m_pHitGroupShaderTable)
+	{
+		m_pHitGroupShaderTable->Release();
+		m_pHitGroupShaderTable = nullptr;
+	}
 
+	if (m_pLocalRootSignature)
+	{
+		m_pLocalRootSignature->Release();
+		m_pLocalRootSignature = nullptr;
+	}
+	if (m_pGlobalRootSignature)
+	{
+		m_pGlobalRootSignature->Release();
+		m_pGlobalRootSignature = nullptr;
+	}
 	m_pEmptyRootSignature->Release();
-	m_pPipelineState->Release();
+	if (m_pPipelineState)
+	{
+		m_pPipelineState->Release();
+		m_pPipelineState = nullptr;
+	}
 
 	m_pBottomLevelAS->Release();
 	m_pTopLevelAS->Release();
@@ -305,7 +335,7 @@ void Application::InitDXR()
 			__debugbreak();
 		}
 
-		m_FrameObjects[i].RTVHandle = CreateRTV(m_pDevice, m_FrameObjects[i].pSwapChainBuffer, m_RTVHeap.pHeap, &m_RTVHeap.UsedEntries, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+		m_FrameObjects[i].RTVHandle = CreateRTV(m_FrameObjects[i].pSwapChainBuffer, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 	}
 
 	hr = m_pDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_FrameObjects[0].pCommandAllocator, nullptr, IID_PPV_ARGS(&m_pCommandList));
@@ -574,66 +604,65 @@ void Application::CreateRTPipelineState()
 	//  1 for pipeline config
 	//  1 for the global root signature
 
-	D3D12_STATE_SUBOBJECT subObjects[10] = {};
-	UINT index = 0;
-	HRESULT hr;
+	//D3D12_STATE_SUBOBJECT subObjects[10] = {};
+	//UINT index = 0;
+	//HRESULT hr;
 
-	// Create the DXIL library
-	DXILLibrary dxilLib = CreateDXILLibrary();
-	subObjects[index++] = dxilLib.StateSubObject; // 0 Library
+	//// Create the DXIL library
+	//DXILLibrary dxilLib = CreateDXILLibrary();
+	//subObjects[index++] = dxilLib.StateSubObject; // 0 Library
 
-	HitProgram hitProgram(nullptr, pszCLOSEST_HIT_SHADER, pszHIT_GROUP[0]);
-	subObjects[index++] = hitProgram.SubObject; // 1 Hit Group
+	//HitProgram hitProgram(nullptr, pszCLOSEST_HIT_SHADER, pszHIT_GROUP[0]);
+	//subObjects[index++] = hitProgram.SubObject; // 1 Hit Group
 
-	// Create the ray-gen root-signature and association
-	LocalRootSignature rgsRootSignature(m_pDevice, CreateRayGenRootDesc().Desc);
-	subObjects[index] = rgsRootSignature.SubObject; // 2 RayGen Root Sig
+	//// Create the ray-gen root-signature and association
+	//LocalRootSignature rgsRootSignature(m_pDevice, CreateRayGenRootDesc().Desc);
+	//subObjects[index] = rgsRootSignature.SubObject; // 2 RayGen Root Sig
 
-	UINT rgsRootIndex = index++; // 2
-	ExportAssociation rgsRootAssociation(&pszRAY_GEN_SHADER, 1, &subObjects[rgsRootIndex]);
-	subObjects[index++] = rgsRootAssociation.SubObject; // 3 Associate Root Sig to RGS
+	//UINT rgsRootIndex = index++; // 2
+	//ExportAssociation rgsRootAssociation(&pszRAY_GEN_SHADER, 1, &subObjects[rgsRootIndex]);
+	//subObjects[index++] = rgsRootAssociation.SubObject; // 3 Associate Root Sig to RGS
 
-	// Create the miss- and hit-programs root-signature and association
-	D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
-	emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	LocalRootSignature hitMissRootSignature(m_pDevice, emptyDesc);
-	subObjects[index] = hitMissRootSignature.SubObject; // 4 Root Sig to be shared between Miss and CHS
+	//// Create the miss- and hit-programs root-signature and association
+	//D3D12_ROOT_SIGNATURE_DESC emptyDesc = {};
+	//emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	//LocalRootSignature hitMissRootSignature(m_pDevice, emptyDesc);
+	//subObjects[index] = hitMissRootSignature.SubObject; // 4 Root Sig to be shared between Miss and CHS
 
-	UINT hitMissRootIndex = index++; // 4
-	const WCHAR* pszMISS_HIT_EXPORT_NAME[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER };
-	ExportAssociation missHitRootAssociation(pszMISS_HIT_EXPORT_NAME, _countof(pszMISS_HIT_EXPORT_NAME), &subObjects[hitMissRootIndex]);
-	subObjects[index++] = missHitRootAssociation.SubObject; // 5 Associate Root Sig to Miss and CHS
+	//UINT hitMissRootIndex = index++; // 4
+	//const WCHAR* pszMISS_HIT_EXPORT_NAME[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER };
+	//ExportAssociation missHitRootAssociation(pszMISS_HIT_EXPORT_NAME, _countof(pszMISS_HIT_EXPORT_NAME), &subObjects[hitMissRootIndex]);
+	//subObjects[index++] = missHitRootAssociation.SubObject; // 5 Associate Root Sig to Miss and CHS
 
-	// Bind the payload size to the programs
-	ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 3);
-	subObjects[index] = shaderConfig.SubObject; // 6 Shader Config
+	//// Bind the payload size to the programs
+	//ShaderConfig shaderConfig(sizeof(float) * 2, sizeof(float) * 3);
+	//subObjects[index] = shaderConfig.SubObject; // 6 Shader Config
 
-	UINT shaderConfigIndex = index++; // 6
-	const WCHAR* pszSHADER_EXPORTS[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER, pszRAY_GEN_SHADER };
-	ExportAssociation configAssociation(pszSHADER_EXPORTS, _countof(pszSHADER_EXPORTS), &(subObjects[shaderConfigIndex]));
-	subObjects[index++] = configAssociation.SubObject; // 7 Associate Shader Config to Miss, CHS, RGS
+	//UINT shaderConfigIndex = index++; // 6
+	//const WCHAR* pszSHADER_EXPORTS[] = { pszMISS_SHADER, pszCLOSEST_HIT_SHADER, pszRAY_GEN_SHADER };
+	//ExportAssociation configAssociation(pszSHADER_EXPORTS, _countof(pszSHADER_EXPORTS), &(subObjects[shaderConfigIndex]));
+	//subObjects[index++] = configAssociation.SubObject; // 7 Associate Shader Config to Miss, CHS, RGS
 
-	// Create the pipeline config
-	PipelineConfig config(1);
-	subObjects[index++] = config.SubObject; // 8
+	//// Create the pipeline config
+	//PipelineConfig config(1);
+	//subObjects[index++] = config.SubObject; // 8
 
-	// Create the global root signature and store the empty signature
-	GlobalRootSignature root(m_pDevice, {});
-	m_pEmptyRootSignature = root.pRootSig;
-	subObjects[index++] = root.SubObject; // 9
+	//// Create the global root signature and store the empty signature
+	//GlobalRootSignature root(m_pDevice, {});
+	//m_pEmptyRootSignature = root.pRootSig;
+	//subObjects[index++] = root.SubObject; // 9
 
-	// Create the state
-	D3D12_STATE_OBJECT_DESC desc = {};
-	desc.NumSubobjects = index; // 10
-	desc.pSubobjects = subObjects;
-	desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+	//// Create the state
+	//D3D12_STATE_OBJECT_DESC desc = {};
+	//desc.NumSubobjects = index; // 10
+	//desc.pSubobjects = subObjects;
+	//desc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
-	hr = m_pDevice->CreateStateObject(&desc, IID_PPV_ARGS(&m_pPipelineState));
-	if (FAILED(hr))
-	{
-		__debugbreak();
-	}
-
+	//hr = m_pDevice->CreateStateObject(&desc, IID_PPV_ARGS(&m_pPipelineState));
+	//if (FAILED(hr))
+	//{
+	//	__debugbreak();
+	//}
 
 
 
@@ -647,7 +676,38 @@ void Application::CreateRTPipelineState()
 
 	if (!CreateHitGroupSubobjects(&raytracingPipelineDesc))
 	{
+		__debugbreak();
+	}
 
+	CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT* pShaderConfig = raytracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+	if (!pShaderConfig)
+	{
+		__debugbreak();
+	}
+	UINT payloadSize = 64; // payload size.
+	UINT attributeSize = sizeof(DirectX::XMFLOAT2);
+	pShaderConfig->Config(payloadSize, attributeSize);
+
+	if (!CreateLocalRootSignatureSubobjects(&raytracingPipelineDesc))
+	{
+		__debugbreak();
+	}
+
+	if (!CreateGlobalRootSignatureSubobjects(&raytracingPipelineDesc))
+	{
+		__debugbreak();
+	}
+
+	CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT* pPipelineConfig = raytracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+	if (!pPipelineConfig)
+	{
+		__debugbreak();
+	}
+	pPipelineConfig->Config(5);
+
+	if (FAILED(m_pDevice->CreateStateObject(raytracingPipelineDesc, IID_PPV_ARGS(&m_pPipelineState))))
+	{
+		__debugbreak();
 	}
 }
 
@@ -701,12 +761,153 @@ void Application::CreateShaderTable()
 	m_pShaderTable->Unmap(0, nullptr);
 
 	pRtsoProps->Release();
+
+
+
+
+
+
+
+
+	void* pRayGenShaderID = nullptr;
+	void* pMissShaderIDs[2] = { nullptr, };
+	void* pHitGroupShaderIDs[2] = { nullptr, };
+
+	std::unordered_map<void*, const WCHAR*> shaderIDToStringMap;
+
+	UINT shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	ID3D12StateObjectProperties* pStateObjectProperties = nullptr;
+	if (FAILED(m_pPipelineState->QueryInterface(IID_PPV_ARGS(&pStateObjectProperties))))
+	{
+		__debugbreak();
+	}
+
+	pRayGenShaderID = pStateObjectProperties->GetShaderIdentifier(pszRAY_GEN_SHADER);
+	shaderIDToStringMap[pRayGenShaderID] = pszRAY_GEN_SHADER;
+
+	pMissShaderIDs[0] = pStateObjectProperties->GetShaderIdentifier(pszMISS_RADIANCE_SHADER);
+	shaderIDToStringMap[pMissShaderIDs[0]] = pszMISS_RADIANCE_SHADER;
+	pMissShaderIDs[1] = pStateObjectProperties->GetShaderIdentifier(pszMISS_PDF_SHADER);
+	shaderIDToStringMap[pMissShaderIDs[1]] = pszMISS_PDF_SHADER;
+
+	pHitGroupShaderIDs[0] = pStateObjectProperties->GetShaderIdentifier(pszHIT_GROUP[0]);
+	shaderIDToStringMap[pHitGroupShaderIDs[0]] = pszHIT_GROUP[0];
+	pHitGroupShaderIDs[1] = pStateObjectProperties->GetShaderIdentifier(pszHIT_GROUP[1]);
+	shaderIDToStringMap[pHitGroupShaderIDs[1]] = pszHIT_GROUP[1];
+
+	// raygen
+	{
+		UINT numShaderRecords = 1;
+		UINT shaderRecordSize = shaderIDSize;
+
+		ShaderTable rayGenShaderTable;
+		if (!rayGenShaderTable.Initialize(this, numShaderRecords, shaderRecordSize, L"RayGenShaderTable"))
+		{
+			__debugbreak();
+		}
+		ShaderRecord rayGenShaderRecord = { 0, };
+		rayGenShaderRecord.pShaderIdentifierPtr = pRayGenShaderID;
+		rayGenShaderRecord.ShaderIdentifierSize = shaderIDSize;
+
+		rayGenShaderTable.PushBack(&rayGenShaderRecord);
+		m_pRaygenShaderTable = rayGenShaderTable.GetResource();
+		m_pRaygenShaderTable->AddRef();
+	}
+
+	// miss
+	{
+		UINT numShaderRecords = 2;
+		UINT shaderRecordSize = shaderIDSize; // No root arguments
+
+		ShaderTable missShaderTable;
+		if (missShaderTable.Initialize(this, numShaderRecords, shaderRecordSize, L"MissShaderTable"))
+		{
+			__debugbreak();
+		}
+		for (UINT i = 0; i < 2; ++i)
+		{
+			ShaderRecord missShaderRecord = { 0, };
+			missShaderRecord.pShaderIdentifierPtr = pMissShaderIDs[i];
+			missShaderRecord.ShaderIdentifierSize = shaderIDSize;
+
+			missShaderTable.PushBack(&missShaderRecord);
+		}
+
+		m_MissShaderTableStrideInBytes = missShaderTable.GetRecordSize();
+		m_pMissShaderTable = missShaderTable.GetResource();
+		m_pMissShaderTable->AddRef();
+	}
+
+	// closest hit
+	{
+		auto& bottomLevelASGeometries = scene.BottomLevelASGeometries();
+		auto& accelerationStructure = *scene.AccelerationStructure();
+		auto& grassPatchVB = scene.GrassPatchVB();
+
+		UINT numShaderRecords = 0;
+		for (SIZE_T i = 0, size = m_Objects.size(); i < size; ++i)
+		{
+			BottomLevelAccelerationStructureGeometry* pGeom = m_Objects[i]->GetASGeometry();
+			_ASSERT(pGeom);
+
+			numShaderRecords += (UINT)pGeom->m_GeometryInstances.size();
+		}
+		for (SIZE_T i = 0, size = m_Lights.size(); i < size; ++i)
+		{
+			BottomLevelAccelerationStructureGeometry* pGeom = m_Lights[i]->GetASGeometry();
+			_ASSERT(pGeom);
+
+			numShaderRecords += (UINT)pGeom->m_GeometryInstances.size();
+		}
+
+		UINT shaderRecordSize = shaderIDSize + sizeof(LocalRootSignature::RootArguments);
+		ShaderTable hitGroupShaderTable;
+		if (!hitGroupShaderTable.Initialize(this, numShaderRecords, shaderRecordSize, L"HitGroupShaderTable"))
+		{
+			__debugbreak();
+		}
+
+		// Triangle geometry hit groups.
+		for (auto& bottomLevelASGeometryPair : bottomLevelASGeometries)
+		{
+			auto& bottomLevelASGeometry = bottomLevelASGeometryPair.second;
+			auto& name = bottomLevelASGeometry.GetName();
+
+			UINT shaderRecordOffset = hitGroupShaderTable.GeNumShaderRecords();
+			accelerationStructure.GetBottomLevelAS(bottomLevelASGeometryPair.first).SetInstanceContributionToHitGroupIndex(shaderRecordOffset);
+
+			for (auto& geometryInstance : bottomLevelASGeometry.m_geometryInstances)
+			{
+				LocalRootSignature::RootArguments rootArgs;
+				rootArgs.cb.materialID = geometryInstance.materialID;
+				rootArgs.cb.isVertexAnimated = geometryInstance.isVertexAnimated;
+
+				memcpy(&rootArgs.indexBufferGPUHandle, &geometryInstance.ib.gpuDescriptorHandle, sizeof(geometryInstance.ib.gpuDescriptorHandle));
+				memcpy(&rootArgs.vertexBufferGPUHandle, &geometryInstance.vb.gpuDescriptorHandle, sizeof(geometryInstance.ib.gpuDescriptorHandle));
+				memcpy(&rootArgs.previousFrameVertexBufferGPUHandle, &m_nullVertexBufferGPUhandle, sizeof(m_nullVertexBufferGPUhandle));
+				memcpy(&rootArgs.diffuseTextureGPUHandle, &geometryInstance.diffuseTexture, sizeof(geometryInstance.diffuseTexture));
+				memcpy(&rootArgs.normalTextureGPUHandle, &geometryInstance.normalTexture, sizeof(geometryInstance.normalTexture));
+
+
+				for (auto& hitGroupShaderID : hitGroupShaderIDs_TriangleGeometry)
+				{
+					hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderID, shaderIDSize, &rootArgs, sizeof(rootArgs)));
+				}
+			}
+		}
+
+		m_hitGroupShaderTableStrideInBytes = hitGroupShaderTable.GetRecordSize();
+		m_pHitGroupShaderTable = hitGroupShaderTable.GetResource();
+		m_pHitGroupShaderTable->AddRef();
+	}
+
+	pStateObjectProperties->Release();
 }
 
 void Application::CreateShaderResources()
 {
 	HRESULT hr = S_OK;
-	CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT, 0, 0);
+	CD3DX12_HEAP_PROPERTIES defaultHeapProps(D3D12_HEAP_TYPE_DEFAULT);
 
 	// Create the output resource. The dimensions and format should match the swap-chain
 	D3D12_RESOURCE_DESC resDesc = {};
@@ -722,21 +923,31 @@ void Application::CreateShaderResources()
 	hr = m_pDevice->CreateCommittedResource(&defaultHeapProps, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&m_pOutputResource)); // Starting as copy-source to simplify onFrameRender()
 
 	// Create an SRV/UAV descriptor heap. Need 2 entries - 1 SRV for the scene and 1 UAV for the output
-	m_pCBVSRVUAVHeap = CreateDescriptorHeap(m_pDevice, 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+	//m_pCBVSRVUAVHeap = CreateDescriptorHeap(m_pDevice, 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
 
 	// Create the UAV. Based on the root signature we created it should be the first entry
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	m_pDevice->CreateUnorderedAccessView(m_pOutputResource, nullptr, &uavDesc, m_pCBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart());
+	//m_pDevice->CreateUnorderedAccessView(m_pOutputResource, nullptr, &uavDesc, m_pCBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart());
+
+	m_pCBVSRVUAVAllocator->AllocDescriptorHandle(&m_OutputResourceCPUHandle);
+	m_pDevice->CreateUnorderedAccessView(m_pOutputResource, nullptr, &uavDesc, m_OutputResourceCPUHandle);
 
 	// Create the TLAS SRV right after the UAV. Note that we are using a different SRV desc here
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.RaytracingAccelerationStructure.Location = m_pTopLevelAS->GetGPUVirtualAddress();
+	srvDesc.RaytracingAccelerationStructure.Location = m_pAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress();
+	/*srvDesc.RaytracingAccelerationStructure.Location = m_pTopLevelAS->GetGPUVirtualAddress();
 	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_pCBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
 	srvHandle.ptr += m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);
+	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);*/
+	m_pCBVSRVUAVAllocator->AllocDescriptorHandle(&m_RadianceTopLevelASCPUHandle);
+	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, m_RadianceTopLevelASCPUHandle);
+
+	srvDesc.RaytracingAccelerationStructure.Location = m_pLightAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress();
+	m_pCBVSRVUAVAllocator->AllocDescriptorHandle(&m_PDFTopLevelASCPUHandle);
+	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, m_PDFTopLevelASCPUHandle);
 }
 
 ID3D12Device5* Application::CreateDevice(IDXGIFactory4* pDXGIFactory)
@@ -850,23 +1061,23 @@ ID3D12DescriptorHeap* Application::CreateDescriptorHeap(ID3D12Device5* pDevice, 
 	return pHeap;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Application::CreateRTV(ID3D12Device5* pDevice, ID3D12Resource* pResource, ID3D12DescriptorHeap* pHeap, UINT* outUsedHeapEntries, DXGI_FORMAT format)
+D3D12_CPU_DESCRIPTOR_HANDLE Application::CreateRTV(ID3D12Resource* pResource, DXGI_FORMAT format)
 {
-	_ASSERT(pDevice);
 	_ASSERT(pResource);
-	_ASSERT(pHeap);
-	_ASSERT(outUsedHeapEntries);
 
 	D3D12_RENDER_TARGET_VIEW_DESC desc = {};
 	desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	desc.Format = format;
 	desc.Texture2D.MipSlice = 0;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pHeap->GetCPUDescriptorHandleForHeapStart();
+	/*D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pHeap->GetCPUDescriptorHandleForHeapStart();
 	rtvHandle.ptr += (*outUsedHeapEntries) * pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	++(*outUsedHeapEntries);
+	++(*outUsedHeapEntries);*/
 
-	pDevice->CreateRenderTargetView(pResource, &desc, rtvHandle);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = {};
+	m_pRTVAllocator->AllocDescriptorHandle(&rtvHandle);
+	m_pDevice->CreateRenderTargetView(pResource, &desc, rtvHandle);
+
 	return rtvHandle;
 }
 
@@ -1082,9 +1293,121 @@ bool Application::CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracin
 {
 	_ASSERT(pRaytracingPipelineDesc);
 
-	// ? hitgroup어지럽네..
+	// Radiance ray
+	CD3DX12_HIT_GROUP_SUBOBJECT* pHitGroup0 = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+	if (!pHitGroup0)
+	{
+		return false;
+	}
+	pHitGroup0->SetClosestHitShaderImport(pszCLOSEST_HIT_RADIANCE_SHADER);
+	pHitGroup0->SetHitGroupExport(pszHIT_GROUP[0]);
+	pHitGroup0->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
 
-	return false;
+	CD3DX12_HIT_GROUP_SUBOBJECT* pHitGroup1 = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+	if (!pHitGroup1)
+	{
+		return false;
+	}
+	pHitGroup1->SetClosestHitShaderImport(pszCLOSEST_HIT_PDF_SHADER);
+	pHitGroup1->SetHitGroupExport(pszHIT_GROUP[1]);
+	pHitGroup1->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
+	return true;
+}
+
+bool Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc)
+{
+	_ASSERT(pRaytracingPipelineDesc);
+
+	CD3DX12_ROOT_PARAMETER rootParams[3];
+	rootParams[0].InitAsConstantBufferView(0, 1); // c0
+	rootParams[1].InitAsShaderResourceView(0, 1); // t0
+	rootParams[2].InitAsShaderResourceView(1, 1); // t1
+
+	CD3DX12_ROOT_SIGNATURE_DESC localRootSignature(_countof(rootParams), rootParams);
+	localRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+	if (!SerializeAndCreateRoogSignature(&localRootSignature, &m_pLocalRootSignature, L"LocalRootSignature"))
+	{
+		return false;
+	}
+
+	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* pLocalRootSignature = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	if (!pLocalRootSignature)
+	{
+		return false;
+	}
+	pLocalRootSignature->SetRootSignature(m_pLocalRootSignature);
+
+	CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+	if (!pRootSignatureAssociation)
+	{
+		return false;
+	}
+	pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
+	pRootSignatureAssociation->AddExports(pszHIT_GROUP);
+
+	return true;
+}
+
+bool Application::CreateGlobalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc)
+{
+	_ASSERT(pRaytracingPipelineDesc);
+
+	CD3DX12_ROOT_PARAMETER rootParams[6];
+	rootParams[0].InitAsConstantBufferView(0); // c0
+	rootParams[1].InitAsShaderResourceView(0); // t0
+	rootParams[2].InitAsShaderResourceView(1); // t1
+	rootParams[3].InitAsShaderResourceView(2); // t2
+	rootParams[4].InitAsShaderResourceView(3); // t3
+	rootParams[5].InitAsUnorderedAccessView(0); // u0
+
+	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignature(_countof(rootParams), rootParams);
+	if (!SerializeAndCreateRoogSignature(&globalRootSignature, &m_pGlobalRootSignature, L"GlobalRootSignature"))
+	{
+		return false;
+	}
+
+	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* pGlobalRootSignature = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	if (!pGlobalRootSignature)
+	{
+		return false;
+	}
+	pGlobalRootSignature->SetRootSignature(m_pGlobalRootSignature);
+
+	return true;
+}
+
+bool Application::SerializeAndCreateRoogSignature(CD3DX12_ROOT_SIGNATURE_DESC* pRootSignatureDesc, ID3D12RootSignature** ppOutRootSignature, const WCHAR* pszNAME)
+{
+	_ASSERT(pRootSignatureDesc);
+	_ASSERT(ppOutRootSignature);
+
+	ID3DBlob* pBlob = nullptr;
+	ID3DBlob* pError = nullptr;
+
+	if (FAILED(D3D12SerializeRootSignature(pRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &pBlob, &pError)))
+	{
+		if (pError)
+		{
+			OutputDebugStringA((const char*)pError->GetBufferPointer());
+			pError->Release();
+
+			return false;
+		}
+	}
+
+	m_pDevice->CreateRootSignature(1, pBlob->GetBufferPointer(), pBlob->GetBufferSize(), IID_PPV_ARGS(ppOutRootSignature));
+	pBlob->Release();
+	if (!*ppOutRootSignature)
+	{
+		return false;
+	}
+	if (pszNAME)
+	{
+		(*ppOutRootSignature)->SetName(pszNAME);
+	}
+
+	return true;
 }
 
 RootSignatureDesc Application::CreateRayGenRootDesc()

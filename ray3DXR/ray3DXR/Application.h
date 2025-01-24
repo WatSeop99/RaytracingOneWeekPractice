@@ -137,7 +137,7 @@ static const WCHAR* pszMISS_PDF_SHADER = L"MissPDF";
 
 static const WCHAR* pszMISS_SHADER = L"Miss";
 static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
-static const WCHAR* pszHIT_GROUP[] = { L"HitGroupRadiance", L"hitGroupPDF" };
+static const WCHAR* pszHIT_GROUP[] = { L"HitGroupRadiance", L"HitGroupPDF" };
 
 class AccelerationStructureManager;
 class DescriptorAllocator;
@@ -189,7 +189,7 @@ private:
 	ID3D12CommandQueue* CreateCommandQueue(ID3D12Device5* pDevice);
 	IDXGISwapChain3* CreateSwapChain(IDXGIFactory4* pFactory, HWND hwnd, UINT width, UINT height, DXGI_FORMAT format, ID3D12CommandQueue* pCommandQueue);
 	ID3D12DescriptorHeap* CreateDescriptorHeap(ID3D12Device5* pDevice, UINT count, D3D12_DESCRIPTOR_HEAP_TYPE type, bool bShaderVisible);
-	D3D12_CPU_DESCRIPTOR_HANDLE CreateRTV(ID3D12Device5* pDevice, ID3D12Resource* pResource, ID3D12DescriptorHeap* pHeap, UINT* outUsedHeapEntries, DXGI_FORMAT format);
+	D3D12_CPU_DESCRIPTOR_HANDLE CreateRTV(ID3D12Resource* pResource, DXGI_FORMAT format);
 
 	ID3D12Resource* CreateTriangleVB(ID3D12Device5* pDevice);
 	AccelerationStructureBuffers CreateBottomLevelAS(ID3D12Device5* pDevice, ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pVertexBuffer);
@@ -200,6 +200,9 @@ private:
 	DXILLibrary CreateDXILLibrary();
 	bool CreateDXILLibrarySubObjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
 	bool CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
+	bool CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
+	bool CreateGlobalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipelineDesc);
+	bool SerializeAndCreateRoogSignature(CD3DX12_ROOT_SIGNATURE_DESC* pRootSignatureDesc, ID3D12RootSignature** ppOutRootSignature, const WCHAR* pszNAME = nullptr);
 	RootSignatureDesc CreateRayGenRootDesc();
 	ID3DBlob* CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* pszTARGET_STRING);
 
@@ -227,11 +230,22 @@ private:
 
 	ID3D12StateObject* m_pPipelineState = nullptr;
 	ID3D12RootSignature* m_pEmptyRootSignature = nullptr;
+	ID3D12RootSignature* m_pGlobalRootSignature = nullptr;
+	ID3D12RootSignature* m_pLocalRootSignature = nullptr;
 
 	ID3D12Resource* m_pShaderTable = nullptr;
+	ID3D12Resource* m_pRaygenShaderTable = nullptr;
+	ID3D12Resource* m_pMissShaderTable = nullptr;
+	ID3D12Resource* m_pHitGroupShaderTable = nullptr;
 	UINT m_ShaderTableEntrySize = 0;
+	UINT m_MissShaderTableStrideInBytes = 0;
 
 	ID3D12Resource* m_pOutputResource = nullptr;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE m_OutputResourceCPUHandle = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE m_RadianceTopLevelASCPUHandle = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE m_PDFTopLevelASCPUHandle = {};
+
 	ID3D12DescriptorHeap* m_pCBVSRVUAVHeap = nullptr;
 
 	ResourceManager* m_pResourceManager = nullptr;

@@ -67,3 +67,40 @@ private:
 	// DO NOT Release directly.
 	Application* m_pApp = nullptr;
 };
+
+struct ShaderRecord
+{
+	void* pShaderIdentifierPtr;
+	void* pLocalRootArgumentsPtr;
+	UINT ShaderIdentifierSize;
+	UINT LocalRootArgumentsSize;
+};
+class ShaderTable
+{
+public:
+	ShaderTable() = default;
+	~ShaderTable() { Cleanup(); }
+
+	bool Initialize(Application* pApp, UINT sizePerData, UINT numData, const WCHAR* pszNAME);
+	bool Cleanup();
+
+	bool Upload();
+
+	void PushBack(const ShaderRecord* pRECORD);
+
+	inline ID3D12Resource* GetResource() { return m_pResource; }
+	inline UINT GetRecordSize() { return m_DataSize; }
+
+private:
+	ID3D12Resource* m_pResource = nullptr;
+	void* m_pMappedResource = nullptr;
+	void* m_pMemData = nullptr;
+
+	UINT m_BufferSize = 0;
+	UINT m_NumData = 0;
+	UINT m_DataSize = 0;
+	UINT m_CurrentRecordCount = 0;
+
+	// DO NOT Release directly.
+	Application* m_pApp = nullptr;
+};
