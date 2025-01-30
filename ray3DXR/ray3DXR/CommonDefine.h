@@ -48,3 +48,13 @@ struct GeometryInstance
 	//D3D12_GPU_DESCRIPTOR_HANDLE NormalTexture;
 	D3D12_RAYTRACING_GEOMETRY_FLAGS GeometryFlags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 };
+
+struct SceneData
+{
+	DirectX::XMFLOAT3 CameraPos;
+	DirectX::XMFLOAT4X4 Projection;
+	DirectX::XMFLOAT4X4 InverseProjection;
+	float MaxRayRecursionDepth;
+	float SceneTime;
+	UINT LightCount;
+};

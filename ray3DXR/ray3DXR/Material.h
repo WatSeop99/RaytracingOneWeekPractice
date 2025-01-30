@@ -123,6 +123,8 @@ public:
 
 	bool AddMaterial(Material* pMaterial);
 
+	inline StructuredBuffer* GetMaterialBuffer() { return m_pMaterialBuffer; }
+
 private:
 	StructuredBuffer* m_pMaterialBuffer = nullptr;
 	std::vector<Material*> m_Materials;

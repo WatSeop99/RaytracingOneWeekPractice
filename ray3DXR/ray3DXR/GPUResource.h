@@ -90,6 +90,7 @@ public:
 
 	inline ID3D12Resource* GetResource() { return m_pResource; }
 	inline UINT GetRecordSize() { return m_DataSize; }
+	inline UINT GetNumRecord() { return m_NumData; }
 
 private:
 	ID3D12Resource* m_pResource = nullptr;

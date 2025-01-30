@@ -128,6 +128,17 @@ struct PipelineConfig
 	D3D12_RAYTRACING_PIPELINE_CONFIG Config;
 	D3D12_STATE_SUBOBJECT SubObject;
 };
+struct MaterialCB
+{
+	UINT MaterialID;
+	float dummy[3];
+};
+struct LocalRootArguments
+{
+	MaterialCB CB;
+	D3D12_GPU_DESCRIPTOR_HANDLE IndicesHandle;
+	D3D12_GPU_DESCRIPTOR_HANDLE VerticesHandle;
+};
 
 static const WCHAR* pszRAY_GEN_SHADER = L"RayGeneration";
 static const WCHAR* pszCLOSEST_HIT_RADIANCE_SHADER = L"ClosestHitForRadianceRay";
@@ -140,6 +151,8 @@ static const WCHAR* pszCLOSEST_HIT_SHADER = L"ClosestHit";
 static const WCHAR* pszHIT_GROUP[] = { L"HitGroupRadiance", L"HitGroupPDF" };
 
 class AccelerationStructureManager;
+class Camera;
+class ConstantBuffer;
 class DescriptorAllocator;
 class MaterialManager;
 class ResourceManager;
@@ -207,7 +220,7 @@ private:
 	ID3DBlob* CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* pszTARGET_STRING);
 
 	UINT64 SubmitCommandList();
-	void ResourceBarrier(ID3D12GraphicsCommandList4* pCommandList, ID3D12Resource* pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
+	void ResourceBarrier(ID3D12Resource* pResource, D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
 
 private:
 	ID3D12Device5* m_pDevice = nullptr;
@@ -239,6 +252,7 @@ private:
 	ID3D12Resource* m_pHitGroupShaderTable = nullptr;
 	UINT m_ShaderTableEntrySize = 0;
 	UINT m_MissShaderTableStrideInBytes = 0;
+	UINT m_HitGroupShaderTableStrideInBytes = 0;
 
 	ID3D12Resource* m_pOutputResource = nullptr;
 
@@ -259,4 +273,8 @@ private:
 
 	std::vector<Object*> m_Objects;
 	std::vector<Object*> m_Lights;
+
+	ConstantBuffer* m_pSceneCB = nullptr;
+
+	Camera* m_pCamera = nullptr;
 };

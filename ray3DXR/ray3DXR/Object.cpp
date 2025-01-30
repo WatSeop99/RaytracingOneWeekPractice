@@ -157,16 +157,8 @@ bool Quad::Initialize(Application* pApp, float width, float height, UINT materia
 	++ms_QuadCount;
 
 	// Set bottom-level instance.
-	AccelerationStructureManager* pASManager = nullptr;
-	if (bIsLightSource)
-	{
-		pASManager = m_pApp->GetLightASManager();
-	}
-	else
-	{
-		pASManager = m_pApp->GetASManager();
-	}
-	return pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
+	AccelerationStructureManager* pASManager = (bIsLightSource ? m_pApp->GetLightASManager() : m_pApp->GetASManager());
+	return (pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
 }
 
 bool Box::Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)

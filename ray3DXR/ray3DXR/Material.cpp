@@ -8,7 +8,7 @@ bool Material::Initialize(Application* pApp)
 {
 	_ASSERT(pApp);
 
-	m_MaterialType = MaterialType_Labmertian;
+	m_MaterialType = MaterialType_None;
 
 	m_pConstantBuffer = new ConstantBuffer;
 	if (!m_pConstantBuffer)
@@ -206,7 +206,6 @@ bool MaterialManager::AddMaterial(Material* pMaterial)
 
 		case MaterialType_None:
 		default:
-			__debugbreak();
 			break;
 	}
 

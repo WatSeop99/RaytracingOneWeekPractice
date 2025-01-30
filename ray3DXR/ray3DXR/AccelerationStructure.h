@@ -2,6 +2,7 @@
 
 #include "CommonDefine.h"
 
+class Application;
 class StructuredBuffer;
 
 class AccelerationStructure
@@ -46,6 +47,7 @@ public:
 	~BottomLevelAccelerationStructureGeometry() = default;
 
 	inline const WCHAR* GetName() { return m_szName; }
+	inline std::vector<GeometryInstance>& GetGeometryInstances() { return m_GeometryInstances; }
 
 	inline void SetName(const WCHAR* pszNAME) { wcsncpy_s(m_szName, MAX_PATH, pszNAME, wcslen(pszNAME)); }
 
@@ -123,7 +125,7 @@ public:
 
 private:
 	TopLevelAccelerationStructure m_TopLevelAS;
-	std::map<const WCHAR*, BottomLevelAccelerationStructure> m_BottomLevelASs;
+	std::map<std::wstring, BottomLevelAccelerationStructure> m_BottomLevelASs;
 
 	StructuredBuffer* m_pBottomLevelASInstanceDescs = nullptr;
 	UINT m_NumBottomLevelASInstances = 0;

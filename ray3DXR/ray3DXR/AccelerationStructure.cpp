@@ -1,4 +1,5 @@
 #include "framework.h"
+#include "Application.h"
 #include "GPUResource.h"
 #include "AccelerationStructure.h"
 
@@ -321,7 +322,7 @@ UINT AccelerationStructureManager::AddBottomLevelASInstance(const WCHAR* pszBott
 		//L"Not enough instance desc buffer size."
 		return -1;
 	}
-
+	   
 	UINT instanceIndex = m_NumBottomLevelASInstances++;
 	BottomLevelAccelerationStructure& bottomLevelAS = m_BottomLevelASs[pszBottomLevelASName];
 
