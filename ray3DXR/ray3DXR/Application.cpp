@@ -912,7 +912,7 @@ void Application::CreateRTPipelineState()
 
 	if (FAILED(m_pDevice->CreateStateObject(raytracingPipelineDesc, IID_PPV_ARGS(&m_pPipelineState))))
 	{
-		__debugbreak();
+ 		__debugbreak();
 	}
 }
 
