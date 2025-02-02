@@ -49,7 +49,7 @@ struct GeometryInstance
 	D3D12_RAYTRACING_GEOMETRY_FLAGS GeometryFlags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 };
 
-struct SceneData
+__declspec(align(16)) struct SceneData
 {
 	DirectX::XMFLOAT3 CameraPos;
 	DirectX::XMFLOAT4X4 Projection;
@@ -57,4 +57,16 @@ struct SceneData
 	float MaxRayRecursionDepth;
 	float SceneTime;
 	UINT LightCount;
+
+	float dummy[2];
+};
+__declspec(align(16)) struct LightSource
+{
+	DirectX::XMFLOAT3 Center;
+	UINT LightGeomType;
+	float Width;
+	float Height;
+	float Radius;
+
+	float dummy;
 };

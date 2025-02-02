@@ -1,5 +1,5 @@
-#ifndef UTIL_HLSL
-#define UTIL_HLSL
+#ifndef RAYUTIL_HLSL
+#define RAYUTIL_HLSL
 
 #include "Common.hlsli"
 

@@ -157,6 +157,7 @@ class DescriptorAllocator;
 class MaterialManager;
 class ResourceManager;
 class TextureManager;
+class StructuredBuffer;
 class Object;
 
 class Application final : public BaseForm
@@ -275,6 +276,7 @@ private:
 	std::vector<Object*> m_Lights;
 
 	ConstantBuffer* m_pSceneCB = nullptr;
+	StructuredBuffer* m_pLightSourceBuffer = nullptr;
 
 	Camera* m_pCamera = nullptr;
 };

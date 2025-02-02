@@ -8,8 +8,10 @@
 #include "Object.h"
 
 UINT Quad::ms_QuadCount = 0;
+UINT Quad::ms_LightQuadCount = 0;
 UINT Box::ms_BoxCount = 0;
 UINT Sphere::ms_SphereCount = 0;
+UINT Sphere::ms_LightSphereCount = 0;
 
 bool Object::Initialize(const WCHAR* pszNAME, UINT sizePerVertex, UINT numVertex, const void* pVERTICES, UINT sizePerIndex, UINT numIndex, const void* pINDICES, bool bIsLightSource)
 {
@@ -127,38 +129,65 @@ bool Object::Cleanup()
 bool Quad::Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)
 {
 	_ASSERT(pApp);
-	_ASSERT(width > 0.0f);
-	_ASSERT(height > 0.0f);
 	_ASSERT(materialID != UINT_MAX);
 
 	m_pApp = pApp;
 	m_MaterialID = materialID;
-	
-	if (ms_QuadCount == 0)
+	m_Width = width;
+	m_Height = height;
+
+	AccelerationStructureManager* pASManager = nullptr;
+	if (bIsLightSource)
 	{
-		DirectX::XMFLOAT3 normal = DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f);
-
-		float halfWidth = width * 0.5f;
-		float halfHeight = height * 0.5f;
-		Vertex vertices[4] =
+		if (ms_LightQuadCount == 0)
 		{
-			{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 0.0f) },
-			{ DirectX::XMFLOAT3(halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 1.0f) },
-			{ DirectX::XMFLOAT3(-halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 0.0f) },
-			{ DirectX::XMFLOAT3(halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 1.0f) },
-		};
-		UINT indices[6] = { 0, 1, 2, 1, 3, 2 };
-
-		if (!Object::Initialize(L"Quad", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource))
-		{
-			return false;
+			if (!InitializeASData(width, height, L"LightQuad", bIsLightSource))
+			{
+				return false;
+			}
 		}
-	}
-	++ms_QuadCount;
+		++ms_LightQuadCount;
 
-	// Set bottom-level instance.
-	AccelerationStructureManager* pASManager = (bIsLightSource ? m_pApp->GetLightASManager() : m_pApp->GetASManager());
-	return (pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
+		pASManager = m_pApp->GetLightASManager();
+		return (pASManager->AddBottomLevelASInstance(L"LightQuad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
+	}
+	else
+	{
+		if (ms_QuadCount == 0)
+		{
+			if (!(InitializeASData(width, height, L"Quad", bIsLightSource)))
+			{
+				return false;
+			}
+		}
+		++ms_QuadCount;
+
+		pASManager = m_pApp->GetASManager();
+		return (pASManager->AddBottomLevelASInstance(L"Quad", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
+	}
+}
+
+bool Quad::InitializeASData(float width, float height, const WCHAR* pszNAME, bool bIsLightSource)
+{
+	_ASSERT(width > 0.0f);
+	_ASSERT(height > 0.0f);
+	_ASSERT(pszNAME);
+	_ASSERT(wcslen(pszNAME) > 0);
+
+	DirectX::XMFLOAT3 normal = DirectX::XMFLOAT3(0.0f, 0.0f, -1.0f);
+
+	float halfWidth = width * 0.5f;
+	float halfHeight = height * 0.5f;
+	Vertex vertices[4] =
+	{
+		{ DirectX::XMFLOAT3(-halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 0.0f) },
+		{ DirectX::XMFLOAT3(halfWidth, -halfHeight, 0.0f), normal, DirectX::XMFLOAT2(0.0f, 1.0f) },
+		{ DirectX::XMFLOAT3(-halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 0.0f) },
+		{ DirectX::XMFLOAT3(halfWidth, halfHeight, 0.0f), normal, DirectX::XMFLOAT2(1.0f, 1.0f) },
+	};
+	UINT indices[6] = { 0, 1, 2, 1, 3, 2 };
+
+	return Object::Initialize(pszNAME, sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource);
 }
 
 bool Box::Initialize(Application* pApp, float width, float height, float depth, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource)
@@ -254,82 +283,100 @@ bool Sphere::Initialize(Application* pApp, float radius, UINT materialID, const 
 	m_pApp = pApp;
 	m_MaterialID = materialID;
 	m_Radius = radius;
+	m_Center = DirectX::XMFLOAT3(TRANSFORM._41, TRANSFORM._42, TRANSFORM._43);
 
-
-	if (ms_SphereCount == 0)
-	{
-		const int NUM_SLICES = 30;
-		const int NUM_STACKS = 30;
-
-		const float D_THETA = -DirectX::XM_2PI / (float)NUM_SLICES;
-		const float D_PHI = -DirectX::XM_PI / (float)NUM_STACKS;
-
-		Vertex vertices[(NUM_STACKS + 1) * (NUM_SLICES + 1)];
-		UINT indices[NUM_SLICES * NUM_STACKS * 6];
-
-		for (int j = 0; j <= NUM_STACKS; ++j)
-		{
-			// 스택에 쌓일 수록 시작점을 x-y 평면에서 회전 시켜서 위로 올리는 구조
-			DirectX::XMFLOAT3 start(0.0f, -m_Radius, 0.0f);
-			DirectX::XMVECTOR stackStartPoint = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&start), DirectX::XMMatrixRotationZ(D_PHI * j));
-			
-			for (int i = 0; i <= NUM_SLICES; ++i)
-			{
-				Vertex& v = vertices[j * (NUM_SLICES + 1) + i];
-
-				DirectX::XMVECTOR temp;
-				DirectX::XMFLOAT4X4 tempMat;
-
-				// 시작점을 x-z 평면에서 회전시키면서 원을 만드는 구조.
-				temp = DirectX::XMVector3Transform(stackStartPoint, DirectX::XMMatrixRotationY(D_THETA * (float)i));
-				DirectX::XMStoreFloat3(&v.Position, temp);
-
-				v.Normal = v.Position; // 원점이 구의 중심.
-				temp = DirectX::XMLoadFloat3(&v.Normal);
-				temp = DirectX::XMVector3Normalize(temp);
-				DirectX::XMStoreFloat3(&v.Normal, temp);
-
-				v.TexCoord = DirectX::XMFLOAT2((float)i / NUM_SLICES, 1.0f - (float)j / NUM_STACKS);
-				/*temp = DirectX::XMLoadFloat2(&v.TexCoord);
-				temp = DirectX::XMVectorMultiply(temp, DirectX::XMVectorReplicate(1.0f));
-				DirectX::XMStoreFloat2(&v.TexCoord, temp);*/
-			}
-		}
-
-		int pushIndex = 0;
-		for (int j = 0; j < NUM_STACKS; ++j)
-		{
-			const int OFFSET = (NUM_SLICES + 1) * j;
-
-			for (int i = 0; i < NUM_SLICES; ++i)
-			{
-				indices[pushIndex++] = OFFSET + i;
-				indices[pushIndex++] = OFFSET + i + NUM_SLICES + 1;
-				indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
-
-				indices[pushIndex++] = OFFSET + i;
-				indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
-				indices[pushIndex++] = OFFSET + i + 1;
-			}
-		}
-		_ASSERT(pushIndex == NUM_SLICES * NUM_STACKS * 6);
-
-		if (!Object::Initialize(L"Sphere", sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource))
-		{
-			return false;
-		}
-	}
-	++ms_SphereCount;
-
-	// Set bottom-level instance.
 	AccelerationStructureManager* pASManager = nullptr;
 	if (bIsLightSource)
 	{
+		if (ms_LightSphereCount == 0)
+		{
+			if (!InitializeASData(radius, L"LightSphere", bIsLightSource))
+			{
+				return false;
+			}
+		}
+		++ms_LightSphereCount;
+
 		pASManager = m_pApp->GetLightASManager();
+		return (pASManager->AddBottomLevelASInstance(L"LightSphere", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
 	}
 	else
 	{
+		if (ms_SphereCount == 0)
+		{
+			if (!(InitializeASData(radius, L"Sphere", bIsLightSource)))
+			{
+				return false;
+			}
+		}
+		++ms_SphereCount;
+
 		pASManager = m_pApp->GetASManager();
+		return (pASManager->AddBottomLevelASInstance(L"Sphere", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM)) != -1);
 	}
-	return pASManager->AddBottomLevelASInstance(L"Sphere", UINT_MAX, DirectX::XMLoadFloat4x4(&TRANSFORM));
+}
+
+bool Sphere::InitializeASData(float radius, const WCHAR* pszNAME, bool bIsLightSource)
+{
+	_ASSERT(radius > 0.0f);
+	_ASSERT(pszNAME);
+	_ASSERT(wcslen(pszNAME) > 0);
+
+	const int NUM_SLICES = 30;
+	const int NUM_STACKS = 30;
+
+	const float D_THETA = -DirectX::XM_2PI / (float)NUM_SLICES;
+	const float D_PHI = -DirectX::XM_PI / (float)NUM_STACKS;
+
+	Vertex vertices[(NUM_STACKS + 1) * (NUM_SLICES + 1)];
+	UINT indices[NUM_SLICES * NUM_STACKS * 6];
+
+	for (int j = 0; j <= NUM_STACKS; ++j)
+	{
+		// 스택에 쌓일 수록 시작점을 x-y 평면에서 회전 시켜서 위로 올리는 구조
+		DirectX::XMFLOAT3 start(0.0f, -m_Radius, 0.0f);
+		DirectX::XMVECTOR stackStartPoint = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&start), DirectX::XMMatrixRotationZ(D_PHI * j));
+
+		for (int i = 0; i <= NUM_SLICES; ++i)
+		{
+			Vertex& v = vertices[j * (NUM_SLICES + 1) + i];
+
+			DirectX::XMVECTOR temp;
+			DirectX::XMFLOAT4X4 tempMat;
+
+			// 시작점을 x-z 평면에서 회전시키면서 원을 만드는 구조.
+			temp = DirectX::XMVector3Transform(stackStartPoint, DirectX::XMMatrixRotationY(D_THETA * (float)i));
+			DirectX::XMStoreFloat3(&v.Position, temp);
+
+			v.Normal = v.Position; // 원점이 구의 중심.
+			temp = DirectX::XMLoadFloat3(&v.Normal);
+			temp = DirectX::XMVector3Normalize(temp);
+			DirectX::XMStoreFloat3(&v.Normal, temp);
+
+			v.TexCoord = DirectX::XMFLOAT2((float)i / NUM_SLICES, 1.0f - (float)j / NUM_STACKS);
+			/*temp = DirectX::XMLoadFloat2(&v.TexCoord);
+			temp = DirectX::XMVectorMultiply(temp, DirectX::XMVectorReplicate(1.0f));
+			DirectX::XMStoreFloat2(&v.TexCoord, temp);*/
+		}
+	}
+
+	int pushIndex = 0;
+	for (int j = 0; j < NUM_STACKS; ++j)
+	{
+		const int OFFSET = (NUM_SLICES + 1) * j;
+
+		for (int i = 0; i < NUM_SLICES; ++i)
+		{
+			indices[pushIndex++] = OFFSET + i;
+			indices[pushIndex++] = OFFSET + i + NUM_SLICES + 1;
+			indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
+
+			indices[pushIndex++] = OFFSET + i;
+			indices[pushIndex++] = OFFSET + i + 1 + NUM_SLICES + 1;
+			indices[pushIndex++] = OFFSET + i + 1;
+		}
+	}
+	_ASSERT(pushIndex == NUM_SLICES * NUM_STACKS * 6);
+
+	return Object::Initialize(pszNAME, sizeof(Vertex), _countof(vertices), vertices, sizeof(UINT), _countof(indices), indices, bIsLightSource);
 }

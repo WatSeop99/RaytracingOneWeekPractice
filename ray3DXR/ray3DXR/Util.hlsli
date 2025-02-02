@@ -3,8 +3,8 @@
 
 #include "Common.hlsli"
 
-const float PI = 3.1415926535f;
-const float PHI = 1.61803398874989484820459f; // ¥Õ = Golden Ratio 
+static const float PI = 3.1415926535f;
+static const float PHI = 1.61803398874989484820459f; // ¥Õ = Golden Ratio 
 
 float GoldNoise(in float2 xy, in float seed)
 {
@@ -13,7 +13,7 @@ float GoldNoise(in float2 xy, in float seed)
 
 float3 GetRandomUnitVector(in uint2 dtID)
 {
-    return float3(GoldNoise(dtID, g_SceneCB.SceneTime + 0.1f), GoldNoise(dtID, g_SceneCB.SceneTime + 0.2f), GoldNoise(, g_SceneCB.SceneTime + 0.3f));
+    return float3(GoldNoise(dtID, g_SceneCB.SceneTime + 0.1f), GoldNoise(dtID, g_SceneCB.SceneTime + 0.2f), GoldNoise(dtID, g_SceneCB.SceneTime + 0.3f));
 }
 
 float GetRandomFloatValue(in uint2 dtID)

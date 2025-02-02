@@ -168,7 +168,8 @@ void Application::OnFrameRender()
 	m_pCommandList->SetComputeRootShaderResourceView(1, m_pAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress());
 	m_pCommandList->SetComputeRootShaderResourceView(2, m_pLightAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress());
 	m_pCommandList->SetComputeRootShaderResourceView(3, m_pMaterialManager->GetMaterialBuffer()->GetGPUAddress());
-	m_pCommandList->SetComputeRootUnorderedAccessView(4, m_pOutputResource->GetGPUVirtualAddress());
+	m_pCommandList->SetComputeRootShaderResourceView(4, m_pLightSourceBuffer->GetGPUAddress());
+	m_pCommandList->SetComputeRootUnorderedAccessView(5, m_pOutputResource->GetGPUVirtualAddress());
 
 	// bind output rt
 
@@ -205,6 +206,11 @@ void Application::OnShutdown()
 	UINT64 lastFenceValue = Fence();
 	WaitForGPU(lastFenceValue);
 
+	if (m_pLightSourceBuffer)
+	{
+		delete m_pLightSourceBuffer;
+		m_pLightSourceBuffer = nullptr;
+	}
 	if (m_pSceneCB)
 	{
 		delete m_pSceneCB;
@@ -662,6 +668,21 @@ void Application::CreateAccelerationStructures()
 		__debugbreak();
 	}
 
+	m_pLightSourceBuffer = new StructuredBuffer;
+	if (!m_pLightSourceBuffer || !m_pLightSourceBuffer->Initialize(this, sizeof(LightSource), 2, nullptr))
+	{
+		__debugbreak();
+	}
+
+	LightSource* pLightDataBuffer = (LightSource*)m_pLightSourceBuffer->GetDataMem();
+	pLightDataBuffer[0].LightGeomType = 1;
+	pLightDataBuffer[0].Width = pQuadLight->GetWidth();
+	pLightDataBuffer[0].Height = pQuadLight->GetHeight();
+	pLightDataBuffer[1].LightGeomType = 2;
+	pLightDataBuffer[1].Center = pSphereLight->GetCenter();
+	pLightDataBuffer[1].Radius = pSphereLight->GetRadius();
+	m_pLightSourceBuffer->Upload();
+
 	UINT64 fenceValue = SubmitCommandList();
 	WaitForGPU(fenceValue);
 }
@@ -777,6 +798,117 @@ void Application::CreateRTPipelineState()
 		__debugbreak();
 	}
 	pPipelineConfig->Config(5);
+
+	{
+		D3D12_STATE_OBJECT_DESC& desc = (D3D12_STATE_OBJECT_DESC)raytracingPipelineDesc;
+		std::wstringstream wstr;
+		wstr << L"\n";
+		wstr << L"--------------------------------------------------------------------\n";
+		wstr << L"| D3D12 State Object 0x" << static_cast<const void*>(&desc) << L": ";
+		if (desc.Type == D3D12_STATE_OBJECT_TYPE_COLLECTION) wstr << L"Collection\n";
+		if (desc.Type == D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE) wstr << L"Raytracing Pipeline\n";
+
+		auto ExportTree = [](UINT depth, UINT numExports, const D3D12_EXPORT_DESC* exports)
+			{
+				std::wostringstream woss;
+				for (UINT i = 0; i < numExports; i++)
+				{
+					woss << L"|";
+					if (depth > 0)
+					{
+						for (UINT j = 0; j < 2 * depth - 1; j++) woss << L" ";
+					}
+					woss << L" [" << i << L"]: ";
+					if (exports[i].ExportToRename) woss << exports[i].ExportToRename << L" --> ";
+					woss << exports[i].Name << L"\n";
+				}
+				return woss.str();
+			};
+
+		for (UINT i = 0; i < desc.NumSubobjects; i++)
+		{
+			wstr << L"| [" << i << L"]: ";
+			switch (desc.pSubobjects[i].Type)
+			{
+				case D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE:
+					wstr << L"Global Root Signature 0x" << desc.pSubobjects[i].pDesc << L"\n";
+					break;
+				case D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE:
+					wstr << L"Local Root Signature 0x" << desc.pSubobjects[i].pDesc << L"\n";
+					break;
+				case D3D12_STATE_SUBOBJECT_TYPE_NODE_MASK:
+					wstr << L"Node Mask: 0x" << std::hex << std::setfill(L'0') << std::setw(8) << *static_cast<const UINT*>(desc.pSubobjects[i].pDesc) << std::setw(0) << std::dec << L"\n";
+					break;
+				case D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY:
+				{
+					wstr << L"DXIL Library 0x";
+					auto lib = static_cast<const D3D12_DXIL_LIBRARY_DESC*>(desc.pSubobjects[i].pDesc);
+					wstr << lib->DXILLibrary.pShaderBytecode << L", " << lib->DXILLibrary.BytecodeLength << L" bytes\n";
+					wstr << ExportTree(1, lib->NumExports, lib->pExports);
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION:
+				{
+					wstr << L"Existing Library 0x";
+					auto collection = static_cast<const D3D12_EXISTING_COLLECTION_DESC*>(desc.pSubobjects[i].pDesc);
+					wstr << collection->pExistingCollection << L"\n";
+					wstr << ExportTree(1, collection->NumExports, collection->pExports);
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+				{
+					wstr << L"Subobject to Exports Association (Subobject [";
+					auto association = static_cast<const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc.pSubobjects[i].pDesc);
+					UINT index = static_cast<UINT>(association->pSubobjectToAssociate - desc.pSubobjects);
+					wstr << index << L"])\n";
+					for (UINT j = 0; j < association->NumExports; j++)
+					{
+						wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
+					}
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+				{
+					wstr << L"DXIL Subobjects to Exports Association (";
+					auto association = static_cast<const D3D12_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc.pSubobjects[i].pDesc);
+					wstr << association->SubobjectToAssociate << L")\n";
+					for (UINT j = 0; j < association->NumExports; j++)
+					{
+						wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
+					}
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG:
+				{
+					wstr << L"Raytracing Shader Config\n";
+					auto config = static_cast<const D3D12_RAYTRACING_SHADER_CONFIG*>(desc.pSubobjects[i].pDesc);
+					wstr << L"|  [0]: Max Payload Size: " << config->MaxPayloadSizeInBytes << L" bytes\n";
+					wstr << L"|  [1]: Max Attribute Size: " << config->MaxAttributeSizeInBytes << L" bytes\n";
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG:
+				{
+					wstr << L"Raytracing Pipeline Config\n";
+					auto config = static_cast<const D3D12_RAYTRACING_PIPELINE_CONFIG*>(desc.pSubobjects[i].pDesc);
+					wstr << L"|  [0]: Max Recursion Depth: " << config->MaxTraceRecursionDepth << L"\n";
+					break;
+				}
+				case D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP:
+				{
+					wstr << L"Hit Group (";
+					auto hitGroup = static_cast<const D3D12_HIT_GROUP_DESC*>(desc.pSubobjects[i].pDesc);
+					wstr << (hitGroup->HitGroupExport ? hitGroup->HitGroupExport : L"[none]") << L")\n";
+					wstr << L"|  [0]: Any Hit Import: " << (hitGroup->AnyHitShaderImport ? hitGroup->AnyHitShaderImport : L"[none]") << L"\n";
+					wstr << L"|  [1]: Closest Hit Import: " << (hitGroup->ClosestHitShaderImport ? hitGroup->ClosestHitShaderImport : L"[none]") << L"\n";
+					wstr << L"|  [2]: Intersection Import: " << (hitGroup->IntersectionShaderImport ? hitGroup->IntersectionShaderImport : L"[none]") << L"\n";
+					break;
+				}
+			}
+			wstr << L"|--------------------------------------------------------------------\n";
+		}
+		wstr << L"\n";
+		OutputDebugStringW(wstr.str().c_str());
+	}
 
 	if (FAILED(m_pDevice->CreateStateObject(raytracingPipelineDesc, IID_PPV_ARGS(&m_pPipelineState))))
 	{
@@ -1396,18 +1528,18 @@ bool Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* 
 	_ASSERT(pRaytracingPipelineDesc);
 
 	CD3DX12_ROOT_PARAMETER rootParams[3];
-	rootParams[0].InitAsConstantBufferView(0, 1); // c0
+	rootParams[0].InitAsConstantBufferView(0, 1); // b0
 	rootParams[1].InitAsShaderResourceView(0, 1); // t0
 	rootParams[2].InitAsShaderResourceView(1, 1); // t1
 
 	CD3DX12_ROOT_SIGNATURE_DESC localRootSignature(_countof(rootParams), rootParams);
 	localRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	if (!SerializeAndCreateRoogSignature(&localRootSignature, &m_pLocalRootSignature, L"LocalRootSignature"))
+	if (!SerializeAndCreateRoogSignature(&localRootSignature, &m_pLocalRootSignature, L"LocalRootSignature") || !m_pLocalRootSignature)
 	{
 		return false;
 	}
 
-	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* pLocalRootSignature = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT* pLocalRootSignature = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
 	if (!pLocalRootSignature)
 	{
 		return false;
@@ -1429,15 +1561,16 @@ bool Application::CreateGlobalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC*
 {
 	_ASSERT(pRaytracingPipelineDesc);
 
-	CD3DX12_ROOT_PARAMETER rootParams[5];
-	rootParams[0].InitAsConstantBufferView(0); // c0
+	CD3DX12_ROOT_PARAMETER rootParams[6];
+	rootParams[0].InitAsConstantBufferView(0); // b0
 	rootParams[1].InitAsShaderResourceView(0); // t0
 	rootParams[2].InitAsShaderResourceView(1); // t1
 	rootParams[3].InitAsShaderResourceView(2); // t2
-	rootParams[4].InitAsUnorderedAccessView(0); // u0
+	rootParams[4].InitAsShaderResourceView(3); // t3
+	rootParams[5].InitAsUnorderedAccessView(0); // u0
 
 	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignature(_countof(rootParams), rootParams);
-	if (!SerializeAndCreateRoogSignature(&globalRootSignature, &m_pGlobalRootSignature, L"GlobalRootSignature"))
+	if (!SerializeAndCreateRoogSignature(&globalRootSignature, &m_pGlobalRootSignature, L"GlobalRootSignature") || !m_pGlobalRootSignature)
 	{
 		return false;
 	}
@@ -1563,10 +1696,23 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 		return nullptr;
 	}
 
-	IDxcOperationResult* pResult = nullptr;
-	hr = pCompiler->Compile(pTextBlob, pszFILE_NAME, L"", pszTARGET_STRING, nullptr, 0, nullptr, 0, nullptr, &pResult);
+	IDxcIncludeHandler* pIncludeHandler = nullptr;
+	hr = pLibrary->CreateIncludeHandler(&pIncludeHandler);
 	if (FAILED(hr))
 	{
+		pTextBlob->Release();
+		pCompiler->Release();
+		pLibrary->Release();
+
+		return nullptr;
+	}
+
+	IDxcOperationResult* pResult = nullptr;
+	const WCHAR* ppszCOMPILE_ARGS[] = { L"-I", L"./" };
+	hr = pCompiler->Compile(pTextBlob, pszFILE_NAME, L"", pszTARGET_STRING, ppszCOMPILE_ARGS, _countof(ppszCOMPILE_ARGS), nullptr, 0, pIncludeHandler, &pResult);
+	if (FAILED(hr))
+	{
+		pIncludeHandler->Release();
 		pTextBlob->Release();
 		pCompiler->Release();
 		pLibrary->Release();
@@ -1584,6 +1730,7 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 
 		pError->Release();
 		pResult->Release();
+		pIncludeHandler->Release();
 		pTextBlob->Release();
 		pCompiler->Release();
 		pLibrary->Release();
@@ -1595,6 +1742,7 @@ ID3DBlob* Application::CompileLibrary(const WCHAR* pszFILE_NAME, const WCHAR* ps
 	pResult->GetResult(&pBlob);
 
 	pResult->Release();
+	pIncludeHandler->Release();
 	pTextBlob->Release();
 	pCompiler->Release();
 	pLibrary->Release();

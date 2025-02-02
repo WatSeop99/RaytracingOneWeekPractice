@@ -1,7 +1,6 @@
 #ifndef HLSL
 #define HLSL
 
-#include "CommonDefine.hlsli"
 #include "Common.hlsli"
 #include "MaterialUtil.hlsli"
 #include "RaytracingUtil.hlsli"
@@ -78,7 +77,7 @@ void RayGeneration()
     uint currentRayRecursionDepth = 0;
     Payload payload = TraceRadianceRay(ray, currentRayRecursionDepth, 0.1f, 10000.0f, dtID);
     
-    g_Output[dtID.xy] = payload.Color;
+    g_Output[dtID.xy] = float4(payload.Color, 1.0f);
 }
 
 [shader("closesthit")]

@@ -9,6 +9,8 @@ struct Scene
     float MaxRayRecursionDepth;
     float SceneTime;
     uint LightCount;
+
+    float dummy[2];
 };
 
 struct ObjectConstants
@@ -26,6 +28,8 @@ struct LightSource
     float Width; // for quad light source.
     float Height; // for quad light source.
     float Radius; // for sphere light source.
+
+    float dummy;
 };
 
 struct Material

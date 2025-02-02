@@ -39,12 +39,22 @@ class Quad final : public Object
 {
 public:
 	Quad() = default;
-	~Quad() { --ms_QuadCount; }
+	~Quad() { --ms_QuadCount; --ms_LightQuadCount; }
 
 	bool Initialize(Application* pApp, float width, float height, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource = false);
 
+	inline float GetWidth() { return m_Width; }
+	inline float GetHeight() { return m_Height; }
+
+private:
+	bool InitializeASData(float width, float height, const WCHAR* pszNAME, bool bIsLightSource);
+
 private:
 	static UINT ms_QuadCount;
+	static UINT ms_LightQuadCount;
+
+	float m_Width = 0.0f;
+	float m_Height = 0.0f;
 };
 
 class Box final : public Object
@@ -63,12 +73,20 @@ class Sphere final : public Object
 {
 public:
 	Sphere() = default;
-	~Sphere() { --ms_SphereCount; }
+	~Sphere() { --ms_SphereCount; --ms_LightSphereCount; }
 
 	bool Initialize(Application* pApp, float radius, UINT materialID, const DirectX::XMFLOAT4X4 TRANSFORM, bool bIsLightSource = false);
 
+	inline DirectX::XMFLOAT3 GetCenter() { return m_Center; }
+	inline float GetRadius() { return m_Radius; }
+
+private:
+	bool InitializeASData(float radius, const WCHAR* pszNAME, bool bIsLightSource);
+
 private:
 	static UINT ms_SphereCount;
+	static UINT ms_LightSphereCount;
 
+	DirectX::XMFLOAT3 m_Center;
 	float m_Radius = 0.0f;
 };
