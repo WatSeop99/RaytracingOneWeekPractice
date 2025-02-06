@@ -65,7 +65,7 @@ LB_RET:
 
 void IndexCreator::Free(ULONG index)
 {
-	if (!m_AllocatedCount)
+	if (m_AllocatedCount == 0)
 	{
 		__debugbreak();
 	}
