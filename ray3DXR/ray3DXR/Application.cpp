@@ -1546,13 +1546,36 @@ bool Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* 
 	}
 	pLocalRootSignature->SetRootSignature(m_pLocalRootSignature);
 
-	CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
-	if (!pRootSignatureAssociation)
+	/*{
+		CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+		if (!pRootSignatureAssociation)
+		{
+			return false;
+		}
+		pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
+		pRootSignatureAssociation->AddExport(pszRAY_GEN_SHADER);
+	}*/
+
+	/*{
+		CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+		if (!pRootSignatureAssociation)
+		{
+			return false;
+		}
+		pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
+		pRootSignatureAssociation->AddExport(pszMISS_RADIANCE_SHADER);
+		pRootSignatureAssociation->AddExport(pszMISS_PDF_SHADER);
+	}*/
+
 	{
-		return false;
+		CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+		if (!pRootSignatureAssociation)
+		{
+			return false;
+		}
+		pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
+		pRootSignatureAssociation->AddExports(pszHIT_GROUP);
 	}
-	pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
-	pRootSignatureAssociation->AddExports(pszHIT_GROUP);
 
 	return true;
 }
