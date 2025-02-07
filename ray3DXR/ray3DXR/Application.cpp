@@ -797,7 +797,7 @@ void Application::CreateRTPipelineState()
 	{
 		__debugbreak();
 	}
-	pPipelineConfig->Config(5);
+	pPipelineConfig->Config(1);
 
 	{
 		D3D12_STATE_OBJECT_DESC& desc = (D3D12_STATE_OBJECT_DESC)raytracingPipelineDesc;
@@ -1192,7 +1192,6 @@ ID3D12Device5* Application::CreateDevice(IDXGIFactory4* pDXGIFactory)
 		hr = D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&pDevice));
 		pAdapter->Release();
 		pAdapter = nullptr;
-
 		if (FAILED(hr))
 		{
 			continue;
@@ -1204,6 +1203,8 @@ ID3D12Device5* Application::CreateDevice(IDXGIFactory4* pDXGIFactory)
 		{
 			return pDevice;
 		}
+
+		pDevice->Release();
 	}
 
 	return nullptr;
@@ -1511,6 +1512,7 @@ bool Application::CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracin
 	pHitGroup0->SetHitGroupExport(pszHIT_GROUP[0]);
 	pHitGroup0->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
 
+	// PDF ray
 	CD3DX12_HIT_GROUP_SUBOBJECT* pHitGroup1 = pRaytracingPipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 	if (!pHitGroup1)
 	{
