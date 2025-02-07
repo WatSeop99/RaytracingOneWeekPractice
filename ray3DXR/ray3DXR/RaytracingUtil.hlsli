@@ -55,7 +55,7 @@ Payload TraceRadianceRay(in Ray ray, in uint curRayRecursion, in float tMin, in 
     return payload;
 }
 
-HitFoundPayload TraceNormalHit(in Ray ray, in float tMin, in float tMax)
+HitFoundPayload TracePDFRay(in Ray ray, in float tMin, in float tMax)
 {
     HitFoundPayload payload;
     payload.HitPoint = float3(0.0f, 0.0f, 0.0f);

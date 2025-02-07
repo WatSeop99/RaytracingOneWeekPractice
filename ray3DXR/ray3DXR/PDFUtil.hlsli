@@ -31,7 +31,7 @@ float GetLightSourcesPDFValue(in float3 P0Origin, in float3 direction)
     [roll]
     for (uint i = 0; i < g_SceneCB.LightCount; ++i)
     {
-        HitFoundPayload payload = TraceNormalHit(ray, 0.1f, 10000.0f);
+        HitFoundPayload payload = TracePDFRay(ray, 0.1f, 10000.0f);
         if(payload.RayTime <= 0.0f)
         {
             continue;
