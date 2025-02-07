@@ -1493,6 +1493,16 @@ bool Application::CreateDXILLibrarySubObjects(CD3DX12_STATE_OBJECT_DESC* pRaytra
 	
 	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)pShaderCode->GetBufferPointer(), pShaderCode->GetBufferSize());
 	pLib->SetDXILLibrary(&libdxil);
+	// Define which shader exports to surface from the library.
+	// If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
+	// In this sample, this could be ommited for convenience since the sample uses all shaders in the library. 
+	{
+		pLib->DefineExport(pszRAY_GEN_SHADER);
+		pLib->DefineExport(pszCLOSEST_HIT_RADIANCE_SHADER);
+		pLib->DefineExport(pszCLOSEST_HIT_PDF_SHADER);
+		pLib->DefineExport(pszMISS_RADIANCE_SHADER);
+		pLib->DefineExport(pszMISS_PDF_SHADER);
+	}
 
 	return true;
 }
