@@ -78,6 +78,9 @@
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DynamicDescriptorPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ray3DXR.cpp">
@@ -122,6 +125,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DynamicDescriptorPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ray3DXR.rc">
@@ -158,6 +164,9 @@
       <Filter>Shader Files</Filter>
     </FxCompile>
     <FxCompile Include="PDFUtil.hlsli">
+      <Filter>Shader Files</Filter>
+    </FxCompile>
+    <FxCompile Include="Random.hlsl">
       <Filter>Shader Files</Filter>
     </FxCompile>
   </ItemGroup>

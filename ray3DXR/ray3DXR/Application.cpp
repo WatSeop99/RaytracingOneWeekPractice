@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "CommonDefine.h"
 #include "DescriptorAllocator.h"
+#include "DynamicDescriptorPool.h"
 #include "DxcDLLSupport.h"
 #include "GPUResource.h"
 #include "Material.h"
@@ -169,7 +170,38 @@ void Application::OnFrameRender()
 	m_pCommandList->SetComputeRootShaderResourceView(2, m_pLightAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress());
 	m_pCommandList->SetComputeRootShaderResourceView(3, m_pMaterialManager->GetMaterialBuffer()->GetGPUAddress());
 	m_pCommandList->SetComputeRootShaderResourceView(4, m_pLightSourceBuffer->GetGPUAddress());
-	m_pCommandList->SetComputeRootUnorderedAccessView(5, m_pOutputResource->GetGPUVirtualAddress());
+	m_pCommandList->SetComputeRootDescriptorTable(5, m_pCBVSRVUAVAllocator->GetGPUHandle(m_OutputResourceCPUHandle));
+	/*{
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuDescriptorTable = {};
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuDescriptorTable = {};
+
+		if (FAILED(m_pDynamicDescriptorPool->AllocDescriptorTable(&cpuDescriptorTable, &gpuDescriptorTable, 6)))
+		{
+			__debugbreak();
+		}
+
+		const UINT CBV_SRV_UAV_SIZE = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		CD3DX12_CPU_DESCRIPTOR_HANDLE descriptorPointer(cpuDescriptorTable, 0, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_pSceneCB->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		descriptorPointer.Offset(1, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_pAccelerationStructureManager->GetTopLevelResource(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		descriptorPointer.Offset(1, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_pLightAccelerationStructureManager->GetTopLevelResource(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		descriptorPointer.Offset(1, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_pMaterialManager->GetMaterialBuffer()->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		descriptorPointer.Offset(1, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_pLightSourceBuffer->GetCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		descriptorPointer.Offset(1, CBV_SRV_UAV_SIZE);
+
+		m_pDevice->CopyDescriptorsSimple(1, descriptorPointer, m_OutputResourceCPUHandle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	
+		m_pCommandList->SetComputeRootDescriptorTable(0, gpuDescriptorTable);
+	}*/
 
 	// bind output rt
 
@@ -234,6 +266,13 @@ void Application::OnShutdown()
 	}
 	m_Lights.clear();
 
+	for (UINT i = 0; i < SWAP_CHAIN_BUFFER; ++i)
+	{
+		m_pRTVAllocator->FreeDescriptorHandle(m_FrameObjects[i].RTVHandle);
+		m_FrameObjects[i].pCommandAllocator->Release();
+		m_FrameObjects[i].pSwapChainBuffer->Release();
+	}
+
 	if (m_pResourceManager)
 	{
 		delete m_pResourceManager;
@@ -260,10 +299,17 @@ void Application::OnShutdown()
 		m_pMaterialManager = nullptr;
 	}
 
-	m_pCBVSRVUAVHeap->Release();
-	m_pOutputResource->Release();
+	//m_pCBVSRVUAVHeap->Release();
+	if (m_pOutputResource)
+	{
+		m_pCBVSRVUAVAllocator->FreeDescriptorHandle(m_OutputResourceCPUHandle);
+		m_OutputResourceCPUHandle = {};
 
-	m_pShaderTable->Release();
+		m_pOutputResource->Release();
+		m_pOutputResource = nullptr;
+	}
+
+	//m_pShaderTable->Release();
 	if (m_pRaygenShaderTable)
 	{
 		m_pRaygenShaderTable->Release();
@@ -290,18 +336,18 @@ void Application::OnShutdown()
 		m_pGlobalRootSignature->Release();
 		m_pGlobalRootSignature = nullptr;
 	}
-	m_pEmptyRootSignature->Release();
+	//m_pEmptyRootSignature->Release();
 	if (m_pPipelineState)
 	{
 		m_pPipelineState->Release();
 		m_pPipelineState = nullptr;
 	}
 
-	m_pBottomLevelAS->Release();
-	m_pTopLevelAS->Release();
-	m_pVertexBuffer->Release();
+	//m_pBottomLevelAS->Release();
+	//m_pTopLevelAS->Release();
+	//m_pVertexBuffer->Release();
 
-	m_RTVHeap.pHeap->Release();
+	//m_RTVHeap.pHeap->Release();
 	if (m_pRTVAllocator)
 	{
 		delete m_pRTVAllocator;
@@ -311,12 +357,6 @@ void Application::OnShutdown()
 	{
 		delete m_pCBVSRVUAVAllocator;
 		m_pCBVSRVUAVAllocator = nullptr;
-	}
-
-	for (UINT i = 0; i < SWAP_CHAIN_BUFFER; ++i)
-	{
-		m_FrameObjects[i].pCommandAllocator->Release();
-		m_FrameObjects[i].pSwapChainBuffer->Release();
 	}
 
 	CloseHandle(m_hFenceEvent);
@@ -393,7 +433,6 @@ void Application::InitDXR()
 	m_pCBVSRVUAVAllocator = new DescriptorAllocator;
 	m_pCBVSRVUAVAllocator->Initialize(m_pDevice, 256, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-
 	for (UINT i = 0, size = _countof(m_FrameObjects); i < size; ++i)
 	{
 		hr = m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_FrameObjects[i].pCommandAllocator));
@@ -458,10 +497,16 @@ void Application::InitDXR()
 
 UINT Application::BeginFrame()
 {
-	_ASSERT(m_pCBVSRVUAVHeap);
+	//_ASSERT(m_pCBVSRVUAVHeap);
+	_ASSERT(m_pCBVSRVUAVAllocator);
 	_ASSERT(m_pCommandList);
 
+	/// Reset command lists.
+	m_FrameObjects[m_FrameIndex].pCommandAllocator->Reset();
+	m_pCommandList->Reset(m_FrameObjects[m_FrameIndex].pCommandAllocator, nullptr);
+
 	ID3D12DescriptorHeap* ppHeaps[] = { m_pCBVSRVUAVAllocator->GetDescriptorHeap() };
+	//ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorPool->GetDescriptorHeap() };
 	m_pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 	return m_pSwapChain->GetCurrentBackBufferIndex();
@@ -495,10 +540,6 @@ void Application::EndFrame()
 		m_pFence->SetEventOnCompletion(m_FenceValue - SWAP_CHAIN_BUFFER + 1, m_hFenceEvent);
 		WaitForSingleObject(m_hFenceEvent, INFINITE);
 	}
-
-	/// Reset command lists.
-	m_FrameObjects[m_FrameIndex].pCommandAllocator->Reset();
-	m_pCommandList->Reset(m_FrameObjects[m_FrameIndex].pCommandAllocator, nullptr);
 }
 
 void Application::CreateAccelerationStructures()
@@ -616,7 +657,7 @@ void Application::CreateAccelerationStructures()
 		__debugbreak();
 	}
 	m_Objects.push_back(pDownPannel);
-	if (!pBox->Initialize(this, 165.0f, 330.0f, 165.0f, pWhite->GetMaterialID(), boxMat))
+	if (!pBox->Initialize(this, 165.0f, 165.0f, 165.0f, pWhite->GetMaterialID(), boxMat))
 	{
 		__debugbreak();
 	}
@@ -1020,7 +1061,7 @@ void Application::CreateShaderTable()
 		UINT shaderRecordSize = shaderIDSize; // No root arguments
 
 		ShaderTable missShaderTable;
-		if (missShaderTable.Initialize(this, numShaderRecords, shaderRecordSize, L"MissShaderTable"))
+		if (!missShaderTable.Initialize(this, numShaderRecords, shaderRecordSize, L"MissShaderTable"))
 		{
 			__debugbreak();
 		}
@@ -1044,14 +1085,20 @@ void Application::CreateShaderTable()
 		for (SIZE_T i = 0, size = m_Objects.size(); i < size; ++i)
 		{
 			BottomLevelAccelerationStructureGeometry* pGeom = m_Objects[i]->GetASGeometry();
-			_ASSERT(pGeom);
+			if (!pGeom)
+			{
+				continue;
+			}
 
 			numShaderRecords += (UINT)pGeom->m_GeometryInstances.size();
 		}
 		for (SIZE_T i = 0, size = m_Lights.size(); i < size; ++i)
 		{
 			BottomLevelAccelerationStructureGeometry* pGeom = m_Lights[i]->GetASGeometry();
-			_ASSERT(pGeom);
+			if (!pGeom)
+			{
+				continue;
+			}
 
 			numShaderRecords += (UINT)pGeom->m_GeometryInstances.size();
 		}
@@ -1067,7 +1114,10 @@ void Application::CreateShaderTable()
 		for (SIZE_T i = 0, size = m_Objects.size(); i < size; ++i)
 		{
 			BottomLevelAccelerationStructureGeometry* pGeom = m_Objects[i]->GetASGeometry();
-			_ASSERT(pGeom);
+			if (!pGeom)
+			{
+				continue;
+			}
 
 			const WCHAR* pszNAME = pGeom->GetName();
 
@@ -1144,12 +1194,8 @@ void Application::CreateShaderResources()
 	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle = m_pCBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
 	srvHandle.ptr += m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, srvHandle);*/
-	m_pCBVSRVUAVAllocator->AllocDescriptorHandle(&m_RadianceTopLevelASCPUHandle);
-	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, m_RadianceTopLevelASCPUHandle);
 
 	srvDesc.RaytracingAccelerationStructure.Location = m_pLightAccelerationStructureManager->GetTopLevelResource()->GetGPUVirtualAddress();
-	m_pCBVSRVUAVAllocator->AllocDescriptorHandle(&m_PDFTopLevelASCPUHandle);
-	m_pDevice->CreateShaderResourceView(nullptr, &srvDesc, m_PDFTopLevelASCPUHandle);
 
 	m_pSceneCB = new ConstantBuffer;
 	if (!m_pSceneCB || !m_pSceneCB->Initialize(this, sizeof(SceneData), nullptr))
@@ -1596,13 +1642,17 @@ bool Application::CreateGlobalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC*
 {
 	_ASSERT(pRaytracingPipelineDesc);
 
+	CD3DX12_DESCRIPTOR_RANGE ranges[1];
+	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0); // u0
+
 	CD3DX12_ROOT_PARAMETER rootParams[6];
 	rootParams[0].InitAsConstantBufferView(0); // b0
 	rootParams[1].InitAsShaderResourceView(0); // t0
 	rootParams[2].InitAsShaderResourceView(1); // t1
 	rootParams[3].InitAsShaderResourceView(2); // t2
 	rootParams[4].InitAsShaderResourceView(3); // t3
-	rootParams[5].InitAsUnorderedAccessView(0); // u0
+	rootParams[5].InitAsDescriptorTable(1, ranges); // u0
+
 
 	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignature(_countof(rootParams), rootParams);
 	if (!SerializeAndCreateRoogSignature(&globalRootSignature, &m_pGlobalRootSignature, L"GlobalRootSignature") || !m_pGlobalRootSignature)

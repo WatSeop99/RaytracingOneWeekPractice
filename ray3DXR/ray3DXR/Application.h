@@ -154,6 +154,7 @@ class AccelerationStructureManager;
 class Camera;
 class ConstantBuffer;
 class DescriptorAllocator;
+class DynamicDescriptorPool;
 class MaterialManager;
 class ResourceManager;
 class TextureManager;
@@ -268,6 +269,9 @@ private:
 	AccelerationStructureManager* m_pAccelerationStructureManager = nullptr;
 	AccelerationStructureManager* m_pLightAccelerationStructureManager = nullptr;
 	MaterialManager* m_pMaterialManager = nullptr;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE m_TopLevelASHandle = {};
+	D3D12_CPU_DESCRIPTOR_HANDLE m_LightTopLevelASHandle = {};
 
 	DescriptorAllocator* m_pRTVAllocator = nullptr;
 	DescriptorAllocator* m_pCBVSRVUAVAllocator = nullptr;

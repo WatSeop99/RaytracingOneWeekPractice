@@ -135,6 +135,7 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="DxcDLLSupport.h" />
+    <ClInclude Include="DynamicDescriptorPool.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GPUResource.h" />
     <ClInclude Include="IndexCreator.h" />
@@ -155,6 +156,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="DxcDLLSupport.cpp" />
+    <ClCompile Include="DynamicDescriptorPool.cpp" />
     <ClCompile Include="GPUResource.cpp" />
     <ClCompile Include="IndexCreator.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -180,6 +182,12 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PDFUtil.hlsli">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="Random.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
