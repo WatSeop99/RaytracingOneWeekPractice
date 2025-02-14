@@ -544,6 +544,7 @@ void Application::EndFrame()
 
 void Application::CreateAccelerationStructures()
 {
+	// test 
 	//m_pVertexBuffer = CreateTriangleVB(m_pDevice);
 	//if (!m_pVertexBuffer)
 	//{
