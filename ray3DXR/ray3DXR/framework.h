@@ -4,35 +4,38 @@
 
 #pragma once
 
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxguid.lib")
+
 #include "targetver.h"
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 // Windows Header Files
 #include <Windows.h>
+#include <wrl.h>
+#include <shellapi.h>
 
-// DXR Header Files
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
+// DirectX Header Files
+#include <dxgi1_6.h>
 #include <d3d12.h>
-#include "d3dx12.h"
-#include <dxcapi.h>
-#include <dxgi1_4.h>
-#include <dxgiformat.h>
 #include <DirectXMath.h>
+#include "d3dx12.h"
+
+#ifdef _DEBUG
+#include <dxgidebug.h>
+#endif
 
 // C RunTime Header Files
-#include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
 #include <memory.h>
 #include <tchar.h>
-#include <math.h>
+
 #include <crtdbg.h>
 
-#include <iostream>
-#include <fstream>
+// C++ RunTime Header Files
 #include <sstream>
-#include <array>
-#include <vector>
-#include <map>
-#include <unordered_map>
 #include <iomanip>
+#include <string>
+#include <vector>
+#include <unordered_map>

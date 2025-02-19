@@ -14,7 +14,7 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="Shader Files">
-      <UniqueIdentifier>{1f640e35-942c-4803-a156-3d378238fdbb}</UniqueIdentifier>
+      <UniqueIdentifier>{714bf5dc-aa7f-456d-b723-edbc1f8f72eb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -30,102 +30,51 @@
     <ClInclude Include="ray3DXR.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BaseForm.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Application.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="d3dx12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DxcDLLSupport.h">
+    <ClInclude Include="DeviceResources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Object.h">
+    <ClInclude Include="DXSample.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Material.h">
+    <ClInclude Include="DXSampleHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Vertex.h">
+    <ClInclude Include="StepTimer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ResourceManager.h">
+    <ClInclude Include="Win32Application.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CommonDefine.h">
+    <ClInclude Include="DirectXRaytracingHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DescriptorAllocator.h">
+    <ClInclude Include="D3D12RaytracingInOneWeekend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IndexCreator.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="HlslCompat.h">
+      <Filter>Shader Files</Filter>
     </ClInclude>
-    <ClInclude Include="TextureManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="AccelerationStructure.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="GPUResource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Texture.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="DynamicDescriptorPool.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="RaytracingHlslCompat.h">
+      <Filter>Shader Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ray3DXR.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BaseForm.cpp">
+    <ClCompile Include="DeviceResources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Application.cpp">
+    <ClCompile Include="DXSample.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DxcDLLSupport.cpp">
+    <ClCompile Include="Win32Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Object.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Material.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ResourceManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="DescriptorAllocator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="IndexCreator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="AccelerationStructure.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="GPUResource.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Texture.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="DynamicDescriptorPool.cpp">
+    <ClCompile Include="D3D12RaytracingInOneWeekend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -143,31 +92,13 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CommonDefine.hlsli">
+    <FxCompile Include="Raytracing.hlsl">
       <Filter>Shader Files</Filter>
-    </None>
-    <None Include="Util.hlsli">
-      <Filter>Shader Files</Filter>
-    </None>
-    <None Include="Common.hlsli">
-      <Filter>Shader Files</Filter>
-    </None>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shader.hlsl">
+    <Text Include="Random.hlsl">
       <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="MaterialUtil.hlsli">
-      <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="RaytracingUtil.hlsli">
-      <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="PDFUtil.hlsli">
-      <Filter>Shader Files</Filter>
-    </FxCompile>
-    <FxCompile Include="Random.hlsl">
-      <Filter>Shader Files</Filter>
-    </FxCompile>
+    </Text>
   </ItemGroup>
 </Project>
