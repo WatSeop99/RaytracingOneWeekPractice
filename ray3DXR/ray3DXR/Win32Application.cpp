@@ -13,10 +13,9 @@
 #include "Win32Application.h"
 #include "DXSampleHelper.h"
 
-HWND Win32Application::m_hwnd = nullptr;
-bool Win32Application::m_fullscreenMode = false;
-RECT Win32Application::m_windowRect;
-using Microsoft::WRL::ComPtr;
+HWND Win32Application::ms_hWnd = nullptr;
+bool Win32Application::ms_bFullscreenMode = false;
+RECT Win32Application::ms_WindowRect;
 
 int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
 {
@@ -24,7 +23,7 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
     {
         // Parse the command line parameters
         int argc;
-        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        WCHAR** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
         pSample->ParseCommandLineArgs(argv, argc);
         LocalFree(argv);
 
@@ -42,10 +41,10 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
         AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
         // Create the window and store a handle to it.
-        m_hwnd = CreateWindow(
+        ms_hWnd = CreateWindow(
             windowClass.lpszClassName,
             pSample->GetTitle(),
-            m_windowStyle,
+            WINDOW_STYLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             windowRect.right - windowRect.left,
@@ -58,7 +57,7 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
         // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
         pSample->OnInit();
 
-        ShowWindow(m_hwnd, nCmdShow);
+        ShowWindow(ms_hWnd, nCmdShow);
 
         // Main sample loop.
         MSG msg = {};
@@ -91,29 +90,29 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
 // Convert a styled window into a fullscreen borderless window and back again.
 void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
 {
-    if (m_fullscreenMode)
+    if (ms_bFullscreenMode)
     {
         // Restore the window's attributes and size.
-        SetWindowLong(m_hwnd, GWL_STYLE, m_windowStyle);
+        SetWindowLong(ms_hWnd, GWL_STYLE, WINDOW_STYLE);
 
         SetWindowPos(
-            m_hwnd,
+            ms_hWnd,
             HWND_NOTOPMOST,
-            m_windowRect.left,
-            m_windowRect.top,
-            m_windowRect.right - m_windowRect.left,
-            m_windowRect.bottom - m_windowRect.top,
+            ms_WindowRect.left,
+            ms_WindowRect.top,
+            ms_WindowRect.right - ms_WindowRect.left,
+            ms_WindowRect.bottom - ms_WindowRect.top,
             SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
-        ShowWindow(m_hwnd, SW_NORMAL);
+        ShowWindow(ms_hWnd, SW_NORMAL);
     }
     else
     {
         // Save the old window rect so we can restore it when exiting fullscreen mode.
-        GetWindowRect(m_hwnd, &m_windowRect);
+        GetWindowRect(ms_hWnd, &ms_WindowRect);
 
         // Make the window borderless so that the client area can fill the screen.
-        SetWindowLong(m_hwnd, GWL_STYLE, m_windowStyle & ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME));
+        SetWindowLong(ms_hWnd, GWL_STYLE, WINDOW_STYLE & ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME));
 
         RECT fullscreenWindowRect;
         try
@@ -155,7 +154,7 @@ void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
         }
 
         SetWindowPos(
-            m_hwnd,
+            ms_hWnd,
             HWND_TOPMOST,
             fullscreenWindowRect.left,
             fullscreenWindowRect.top,
@@ -164,20 +163,20 @@ void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
             SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
 
-        ShowWindow(m_hwnd, SW_MAXIMIZE);
+        ShowWindow(ms_hWnd, SW_MAXIMIZE);
     }
 
-    m_fullscreenMode = !m_fullscreenMode;
+    ms_bFullscreenMode = !ms_bFullscreenMode;
 }
 
 void Win32Application::SetWindowZorderToTopMost(bool setToTopMost)
 {
     RECT windowRect = {};
-    GetWindowRect(m_hwnd, &windowRect);
+    GetWindowRect(ms_hWnd, &windowRect);
 
     SetWindowPos(
-        m_hwnd,
-        (setToTopMost) ? HWND_TOPMOST : HWND_NOTOPMOST,
+        ms_hWnd,
+        (setToTopMost ? HWND_TOPMOST : HWND_NOTOPMOST),
         windowRect.left,
         windowRect.top,
         windowRect.right - windowRect.left,
@@ -197,8 +196,8 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             // Save the DXSample* passed in to CreateWindow.
             LPCREATESTRUCT pCreateStruct = (LPCREATESTRUCT)lParam;
             SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)pCreateStruct->lpCreateParams);
+            return 0;
         }
-        return 0;
 
         case WM_KEYDOWN:
             if (pSample)
@@ -282,16 +281,18 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             UINT x = LOWORD(lParam);
             UINT y = HIWORD(lParam);
             pSample->OnLeftButtonDown(x, y);
+
+            return 0;
         }
-        return 0;
 
         case WM_LBUTTONUP:
         {
             UINT x = LOWORD(lParam);
             UINT y = HIWORD(lParam);
             pSample->OnLeftButtonUp(x, y);
+
+            return 0;
         }
-        return 0;
 
         case WM_DESTROY:
             PostQuitMessage(0);

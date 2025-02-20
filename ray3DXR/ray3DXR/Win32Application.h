@@ -21,15 +21,15 @@ public:
     static int Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow);
     static void ToggleFullscreenWindow(IDXGISwapChain* pOutput = nullptr);
     static void SetWindowZorderToTopMost(bool setToTopMost);
-    static inline HWND GetHwnd() { return m_hwnd; }
-    static inline bool IsFullscreen() { return m_fullscreenMode; }
+    static inline HWND GetHwnd() { return ms_hWnd; }
+    static inline bool IsFullscreen() { return ms_bFullscreenMode; }
 
 protected:
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
-    static HWND m_hwnd;
-    static bool m_fullscreenMode;
-    static const UINT m_windowStyle = WS_OVERLAPPEDWINDOW;
-    static RECT m_windowRect;
+    static HWND ms_hWnd;
+    static bool ms_bFullscreenMode;
+    static const UINT WINDOW_STYLE = WS_OVERLAPPEDWINDOW;
+    static RECT ms_WindowRect;
 };

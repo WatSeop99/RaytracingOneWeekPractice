@@ -124,9 +124,9 @@ void MyRaygenShader()
         uv.y *= -1; // directx 
  
         float2 offset = aperture / 2 * RandomInUnitDisk(randomSeed);
-        float4 origin = mul(float4(offset, 0, 1), frameBuffer.modelViewInverse);
-        float4 target = mul((float4(uv.x, uv.y, 1, 1)), frameBuffer.projectionToWorld);
-        float4 direction = mul(float4(normalize(target.xyz * focusDistance - float3(offset, 0)), 0), frameBuffer.modelViewInverse);
+        float4 origin = mul(float4(offset, 0, 1), frameBuffer.ModelViewInverse);
+        float4 target = mul((float4(uv.x, uv.y, 1, 1)), frameBuffer.ProjectionToWorld);
+        float4 direction = mul(float4(normalize(target.xyz * focusDistance - float3(offset, 0)), 0), frameBuffer.ModelViewInverse);
        
         for (int i = 0; i <= bounces; ++i)
         {

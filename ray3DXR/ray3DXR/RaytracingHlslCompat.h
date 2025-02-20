@@ -23,9 +23,9 @@ typedef UINT16 Index;
 
 struct FrameBuffer
 {
-	XMMATRIX projectionToWorld;
-	XMMATRIX modelViewInverse;
-	XMVECTOR cameraPosition;
+	XMMATRIX ProjectionToWorld;
+	XMMATRIX ModelViewInverse;
+	XMVECTOR CameraPosition;
 };
 
 struct MeshBuffer

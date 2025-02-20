@@ -38,8 +38,49 @@ namespace LocalRootSignatureParams
 
 class D3D12RaytracingInOneWeekend : public DXSample
 {
+private:
+	union AlignedSceneConstantBuffer
+	{
+		FrameBuffer Constants;
+		UINT8 AlignmentPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
+	};
+	struct D3DBuffer
+	{
+		ID3D12Resource* pResource;
+		D3D12_CPU_DESCRIPTOR_HANDLE CPUDescriptorHandle;
+		D3D12_GPU_DESCRIPTOR_HANDLE GPUDescriptorHandle;
+	};
+	struct Geometry
+	{
+		std::vector<Vertex> Vertices;
+		std::vector<UINT32> Indices;
+		XMFLOAT4 Albedo;
+		int MaterialID;
+
+		XMMATRIX Transform;
+
+		SIZE_T IndicesOffsetInBytes;
+		SIZE_T VerticesOffsetInBytes;
+
+
+		// Acceleration structure
+		ID3D12Resource* pBottomLevelAccelerationStructure;
+	};
+#define INIT_BUFFER { nullptr, { 0xFFFFFFFFFFFFFFFF, }, { 0xFFFFFFFFFFFFFFFF, } }
+#define INIT_GEOMETRY { {}, {}, { 0.0f, 0.0f, 0.0f, 1.0f }, 0, XMMatrixIdentity(), 0, 0, nullptr }
+
+	static const UINT FRAME_COUNT = 3;
+
+	static const WCHAR* HIT_GROUP_NAME;
+	static const WCHAR* RAYGEN_SHADER_NAME;
+	static const WCHAR* CLOSEST_HIT_SHADER_NAME;
+	static const WCHAR* MISS_SHADER_NAME;
+
+	// We'll allocate space for several of these and they will need to be padded for alignment.
+	static_assert(sizeof(FrameBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here.");
+
 public:
-	D3D12RaytracingInOneWeekend(UINT width, UINT height, std::wstring name);
+	D3D12RaytracingInOneWeekend(UINT width, UINT height, const WCHAR* pszName);
 
 	// IDeviceNotify
 	virtual void OnDeviceLost() override;
@@ -49,21 +90,37 @@ public:
 	virtual void OnInit();
 	virtual void OnUpdate();
 	virtual void OnRender();
-	virtual void OnSizeChanged(UINT width, UINT height, bool minimized);
+	virtual void OnSizeChanged(UINT width, UINT height, bool bMinimized);
 	virtual void OnDestroy();
-	virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
+	inline virtual IDXGISwapChain* GetSwapchain() { return m_pDeviceResources->GetSwapChain(); }
 
 private:
-	static const UINT FrameCount = 3;
+	void UpdateCameraMatrices();
+	void InitializeScene();
+	void RecreateD3D();
+	void DoRaytracing();
+	void CreateConstantBuffers();
+	void CreateDeviceDependentResources();
+	void CreateWindowSizeDependentResources();
+	void ReleaseDeviceDependentResources();
+	void ReleaseWindowSizeDependentResources();
+	void CreateRaytracingInterfaces();
+	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC* pDesc, ID3D12RootSignature** ppRootSig);
+	void CreateRootSignatures();
+	void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRaytracingPipeline);
+	void CreateRaytracingPipelineStateObject();
+	void CreateDescriptorHeap();
+	void CreateRaytracingOutputResource();
+	void BuildGeometry();
+	void BuildAccelerationStructures();
+	void BuildShaderTables();
+	void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
+	void CopyRaytracingOutputToBackbuffer();
+	void CalculateFrameStats();
+	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* pCPUDescriptor, UINT descriptorIndexToUse = UINT_MAX);
+	UINT CreateBufferSRV(D3DBuffer* pBuffer, UINT numElements, UINT elementSize);
 
-	// We'll allocate space for several of these and they will need to be padded for alignment.
-	static_assert(sizeof(FrameBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here.");
-
-	union AlignedSceneConstantBuffer
-	{
-		FrameBuffer constants;
-		uint8_t alignmentPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
-	};
+private:
 	AlignedSceneConstantBuffer* m_pMappedConstantData = nullptr;
 	ID3D12Resource* m_pPerFrameConstants = nullptr;
 
@@ -78,87 +135,34 @@ private:
 
 	// Descriptors
 	ID3D12DescriptorHeap* m_pDescriptorHeap = nullptr;
-	UINT m_descriptorsAllocated;
-	UINT m_descriptorSize;
+	UINT m_DescriptorsAllocated = 0;
+	UINT m_DescriptorSize = 0;
 
 	// Raytracing scene
-	FrameBuffer m_frameCB[FrameCount];
+	FrameBuffer m_FrameCB[FRAME_COUNT] = {};
 
 	// Geometry
-	struct D3DBuffer
-	{
-		ComPtr<ID3D12Resource> resource;
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptorHandle;
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptorHandle;
-	};
-
-	struct Geometry
-	{
-		std::vector<Vertex> vertices;
-		std::vector<int> indices;
-		XMFLOAT4 albedo = XMFLOAT4{ 0.0, 0.0, 0.0, 1.0 };
-		int materialId = 0;
-
-		XMMATRIX transform = XMMatrixIdentity();
-
-		size_t indicesOffsetInBytes = 0;
-		size_t verticesOffsetInBytes = 0;
-
-
-		// Acceleration structure
-		ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
-	};
-
-	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
+	ID3D12Resource* m_pTopLevelAccelerationStructure = nullptr;
 
 	std::vector<Geometry> m_geometry;
 
-	D3DBuffer m_vertexBuffer;
-	D3DBuffer m_indexBuffer;
+	D3DBuffer m_VertexBuffer = INIT_BUFFER;
+	D3DBuffer m_IndexBuffer = INIT_BUFFER;
 
 	// Raytracing output
-	ID3D12Resource* m_pRaytracingOutput = nullptr;
+	ComPtr<ID3D12Resource> m_pRaytracingOutput = nullptr;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
-	UINT m_raytracingOutputResourceUAVDescriptorHeapIndex;
+	UINT m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
 	// Shader tables
-	static const wchar_t* c_hitGroupName;
-	static const wchar_t* c_raygenShaderName;
-	static const wchar_t* c_closestHitShaderName;
-	static const wchar_t* c_missShaderName;
-	ComPtr<ID3D12Resource> m_missShaderTable;
-	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
-	ComPtr<ID3D12Resource> m_rayGenShaderTable;
+	ID3D12Resource* m_pMissShaderTable = nullptr;
+	ID3D12Resource* m_pHitGroupShaderTable = nullptr;
+	ID3D12Resource* m_pRayGenShaderTable = nullptr;
 
 	// Application state
-	StepTimer m_timer;
-	float m_curRotationAngleRad;
-	XMVECTOR m_eye;
-	XMVECTOR m_at;
-	XMVECTOR m_up;
-
-	void UpdateCameraMatrices();
-	void InitializeScene();
-	void RecreateD3D();
-	void DoRaytracing();
-	void CreateConstantBuffers();
-	void CreateDeviceDependentResources();
-	void CreateWindowSizeDependentResources();
-	void ReleaseDeviceDependentResources();
-	void ReleaseWindowSizeDependentResources();
-	void CreateRaytracingInterfaces();
-	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ID3D12RootSignature** ppRootSig);
-	void CreateRootSignatures();
-	void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
-	void CreateRaytracingPipelineStateObject();
-	void CreateDescriptorHeap();
-	void CreateRaytracingOutputResource();
-	void BuildGeometry();
-	void BuildAccelerationStructures();
-	void BuildShaderTables();
-	void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
-	void CopyRaytracingOutputToBackbuffer();
-	void CalculateFrameStats();
-	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
-	UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
+	StepTimer m_Timer;
+	float m_CurRotationAngleRad = 0.0f;
+	XMVECTOR m_Eye;
+	XMVECTOR m_At;
+	XMVECTOR m_Up;
 };

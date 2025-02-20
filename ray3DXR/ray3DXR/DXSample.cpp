@@ -15,44 +15,49 @@
 using namespace Microsoft::WRL;
 using namespace std;
 
-DXSample::DXSample(UINT width, UINT height, std::wstring name) :
-    m_width(width),
-    m_height(height),
-    m_windowBounds{ 0,0,0,0 },
-    m_title(name),
-    m_aspectRatio(0.0f),
-    m_enableUI(true),
-    m_adapterIDoverride(UINT_MAX)
+DXSample::DXSample(UINT width, UINT height, const WCHAR* pszName) :
+    m_Width(width),
+    m_Height(height)
 {
     WCHAR assetsPath[512];
     GetAssetsPath(assetsPath, _countof(assetsPath));
-    m_assetsPath = assetsPath;
+    wcsncpy_s(m_szAssetsPath, 512, assetsPath, wcslen(assetsPath));
+
+    wcsncpy_s(m_szTitle, 512, pszName, wcslen(pszName));
 
     UpdateForSizeChange(width, height);
 }
 
 DXSample::~DXSample()
-{}
+{
+    if (m_pDeviceResources)
+    {
+        delete m_pDeviceResources;
+        m_pDeviceResources = nullptr;
+    }
+}
 
 void DXSample::UpdateForSizeChange(UINT clientWidth, UINT clientHeight)
 {
-    m_width = clientWidth;
-    m_height = clientHeight;
-    m_aspectRatio = (float)clientWidth / (float)clientHeight;
+    m_Width = clientWidth;
+    m_Height = clientHeight;
+    m_AspectRatio = (float)clientWidth / (float)clientHeight;
 }
 
 // Helper function for resolving the full path of assets.
-std::wstring DXSample::GetAssetFullPath(LPCWSTR assetName)
+const WCHAR* DXSample::GetAssetFullPath(const WCHAR* pszAssetName)
 {
-    return m_assetsPath + assetName;
+    wcscat_s(m_szAssetsPath, 512, pszAssetName);
+    return m_szAssetsPath;
 }
 
 
 // Helper function for setting the window's title text.
-void DXSample::SetCustomWindowText(LPCWSTR text)
+void DXSample::SetCustomWindowText(const WCHAR* pszText)
 {
-    std::wstring windowText = m_title + L": " + text;
-    SetWindowText(Win32Application::GetHwnd(), windowText.c_str());
+    WCHAR windowText[1024];
+    swprintf_s(windowText, 1024, L"%s: %s", m_szTitle, pszText);
+    SetWindowText(Win32Application::GetHwnd(), windowText);
 }
 
 // Helper function for parsing any supplied command line args.
@@ -65,7 +70,7 @@ void DXSample::ParseCommandLineArgs(WCHAR* argv[], int argc)
         if (_wcsnicmp(argv[i], L"-disableUI", wcslen(argv[i])) == 0 ||
             _wcsnicmp(argv[i], L"/disableUI", wcslen(argv[i])) == 0)
         {
-            m_enableUI = false;
+            m_bEnableUI = false;
         }
         // -forceAdapter [id]
         else if (_wcsnicmp(argv[i], L"-forceAdapter", wcslen(argv[i])) == 0 ||
@@ -73,7 +78,7 @@ void DXSample::ParseCommandLineArgs(WCHAR* argv[], int argc)
         {
             ThrowIfFalse(i + 1 < argc, L"Incorrect argument format passed in.");
 
-            m_adapterIDoverride = _wtoi(argv[i + 1]);
+            m_AdapterIDoverride = _wtoi(argv[i + 1]);
             i++;
         }
     }
@@ -82,8 +87,8 @@ void DXSample::ParseCommandLineArgs(WCHAR* argv[], int argc)
 
 void DXSample::SetWindowBounds(int left, int top, int right, int bottom)
 {
-    m_windowBounds.left = (long)left;
-    m_windowBounds.top = (long)top;
-    m_windowBounds.right = (long)right;
-    m_windowBounds.bottom = (long)bottom;
+    m_WindowBounds.left = (long)left;
+    m_WindowBounds.top = (long)top;
+    m_WindowBounds.right = (long)right;
+    m_WindowBounds.bottom = (long)bottom;
 }

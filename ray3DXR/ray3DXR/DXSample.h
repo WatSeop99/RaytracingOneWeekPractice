@@ -18,7 +18,7 @@
 class DXSample : public DX::IDeviceNotify
 {
 public:
-    DXSample(UINT width, UINT height, std::wstring name);
+    DXSample(UINT width, UINT height, const WCHAR* pszName);
     virtual ~DXSample();
 
     virtual void OnInit() = 0;
@@ -40,39 +40,40 @@ public:
     virtual void ParseCommandLineArgs(_In_reads_(argc) WCHAR* argv[], int argc);
 
     // Accessors.
-    inline UINT GetWidth() const { return m_width; }
-    inline UINT GetHeight() const { return m_height; }
-    inline const WCHAR* GetTitle() const { return m_title.c_str(); }
-    inline RECT GetWindowsBounds() const { return m_windowBounds; }
+    inline UINT GetWidth() const { return m_Width; }
+    inline UINT GetHeight() const { return m_Height; }
+    inline const WCHAR* GetTitle() const { return m_szTitle; }
+    inline RECT GetWindowsBounds() const { return m_WindowBounds; }
     inline virtual IDXGISwapChain* GetSwapchain() { return nullptr; }
-    inline DX::DeviceResources* GetDeviceResources() const { return m_deviceResources.get(); }
+    inline const DX::DeviceResources* GetDeviceResources() const { return m_pDeviceResources; }
 
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
     void SetWindowBounds(int left, int top, int right, int bottom);
-    std::wstring GetAssetFullPath(LPCWSTR assetName);
+    const WCHAR* GetAssetFullPath(const WCHAR* pszAssetName);
 
 protected:
-    void SetCustomWindowText(LPCWSTR text);
+    void SetCustomWindowText(const WCHAR* pszText);
 
+protected:
     // Viewport dimensions.
-    UINT m_width;
-    UINT m_height;
-    float m_aspectRatio;
+    UINT m_Width;
+    UINT m_Height;
+    float m_AspectRatio = 0.0f;
 
     // Window bounds
-    RECT m_windowBounds;
+    RECT m_WindowBounds = { 0,0,0,0 };
 
     // Override to be able to start without Dx11on12 UI for PIX. PIX doesn't support 11 on 12. 
-    bool m_enableUI;
+    bool m_bEnableUI = true;
 
     // D3D device resources
-    UINT m_adapterIDoverride;
-    std::unique_ptr<DX::DeviceResources> m_deviceResources;
+    UINT m_AdapterIDoverride = UINT_MAX;
+    DX::DeviceResources* m_pDeviceResources = nullptr;
 
 private:
     // Root assets path.
-    std::wstring m_assetsPath;
+    WCHAR m_szAssetsPath[512];
 
     // Window title.
-    std::wstring m_title;
+    WCHAR m_szTitle[512];
 };
