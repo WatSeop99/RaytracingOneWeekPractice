@@ -30,18 +30,18 @@ struct FrameBuffer
 
 struct MeshBuffer
 {
-	XMFLOAT4 albedo;
-	int meshId;
-	int materialId;
-	int verticesOffset;
-	int indicesOffset;
+	XMFLOAT4 Albedo;
+	int MeshID;
+	int MaterialID;
+	int VerticesOffset;
+	int IndicesOffset;
 };
 
 struct Vertex
 {
-	XMFLOAT3 position;
+	XMFLOAT3 Position;
 	float pad1;
-	XMFLOAT3 normal;
+	XMFLOAT3 Normal;
 	float pad2;
 };
 

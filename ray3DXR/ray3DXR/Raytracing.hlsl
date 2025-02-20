@@ -170,7 +170,7 @@ void MyRaygenShader()
 
     // Write the raytraced color to the output texture.
     RenderTarget[DispatchRaysIndex().xy].rgb = color;
-    RenderTarget[DispatchRaysIndex().xy].a = 1.0;
+    RenderTarget[DispatchRaysIndex().xy].a = 1.0f;
 }
 
 [shader("closesthit")]
@@ -181,7 +181,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
  
     uint indicesPerTriangle = 3;
     uint baseIdx = indicesPerTriangle * PrimitiveIndex();
-    uint indexWithOffset = baseIdx + meshBuffer.indicesOffset;
+    uint indexWithOffset = baseIdx + meshBuffer.IndicesOffset;
     
     int i0 = Indices[indexWithOffset + 0];
     int i1 = Indices[indexWithOffset + 1];
@@ -190,9 +190,9 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     // Retrieve corresponding vertex normals for the triangle vertices.
     float3 vertexNormals[3] =
     {
-        Vertices[i0 + meshBuffer.verticesOffset].normal,
-        Vertices[i1 + meshBuffer.verticesOffset].normal,
-        Vertices[i2 + meshBuffer.verticesOffset].normal 
+        Vertices[i0 + meshBuffer.VerticesOffset].Normal,
+        Vertices[i1 + meshBuffer.VerticesOffset].Normal,
+        Vertices[i2 + meshBuffer.VerticesOffset].Normal 
     };
 
     // Compute the triangle's normal.
@@ -201,18 +201,18 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
     float t = RayTCurrent();
    
-    int materialId = meshBuffer.materialId;
+    int materialId = meshBuffer.MaterialID;
     switch (materialId)
     {
         case 0:
-            payload = ScatterLambertian(meshBuffer.albedo, worlRayDirection, triangleNormal, t, payload.seed);
+            payload = ScatterLambertian(meshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.seed);
             break;
         case 1:
-            payload = ScatterMetal(meshBuffer.albedo, worlRayDirection, triangleNormal, t, payload.seed);
+            payload = ScatterMetal(meshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.seed);
             break;
         case 2:
-            float refractionIndex = meshBuffer.albedo.x;
-            payload = ScatterDielectric(meshBuffer.albedo, worlRayDirection, triangleNormal, t, payload.seed, refractionIndex);
+            float refractionIndex = meshBuffer.Albedo.x;
+            payload = ScatterDielectric(meshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.seed, refractionIndex);
             break;
     }
 }

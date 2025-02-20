@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClCompile Include="D3D12RaytracingInOneWeekend.cpp" />
     <ClCompile Include="DeviceResources.cpp" />
+    <ClCompile Include="DirectXRaytracingHelper.cpp" />
     <ClCompile Include="DXSample.cpp" />
     <ClCompile Include="ray3DXR.cpp" />
     <ClCompile Include="Win32Application.cpp" />

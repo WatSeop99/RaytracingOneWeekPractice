@@ -211,20 +211,20 @@ void ResetUniquePtrArray(T* uniquePtrArray)
     }
 }
 
-class GpuUploadBuffer
+class GPUUploadBuffer
 {
 public:
-    ComPtr<ID3D12Resource> GetResource() { return m_resource; }
+    ID3D12Resource* GetResource() { return m_pResource; }
 
 protected:
-    ComPtr<ID3D12Resource> m_resource;
-
-    GpuUploadBuffer() {}
-    ~GpuUploadBuffer()
+    GPUUploadBuffer() = default;
+    virtual ~GPUUploadBuffer()
     {
-        if (m_resource.Get())
+        if (m_pResource)
         {
-            m_resource->Unmap(0, nullptr);
+            m_pResource->Unmap(0, nullptr);
+            m_pResource->Release();
+            m_pResource = nullptr;
         }
     }
 
@@ -239,25 +239,28 @@ protected:
             &bufferDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&m_resource)));
-        m_resource->SetName(resourceName);
+            IID_PPV_ARGS(&m_pResource)));
+        m_pResource->SetName(resourceName);
     }
 
     UINT8* MapCpuWriteOnly()
     {
-        UINT8* mappedData = nullptr;
+        UINT8* pMappedData = nullptr;
         // We don't unmap this until the app closes. Keeping buffer mapped for the lifetime of the resource is okay.
         CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(m_resource->Map(0, &readRange, reinterpret_cast<void**>(&mappedData)));
-        return mappedData;
+        ThrowIfFailed(m_pResource->Map(0, &readRange, reinterpret_cast<void**>(&pMappedData)));
+        return pMappedData;
     }
+
+protected:
+    ID3D12Resource* m_pResource = nullptr;
 };
 
 struct D3DBuffer
 {
-    ComPtr<ID3D12Resource> resource;
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptorHandle;
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuDescriptorHandle;
+    ID3D12Resource* pResource;
+    D3D12_CPU_DESCRIPTOR_HANDLE CPUDescriptorHandle;
+    D3D12_GPU_DESCRIPTOR_HANDLE GPUDescriptorHandle;
 };
 
 // Helper class to create and update a constant buffer with proper constant buffer alignments.
@@ -267,37 +270,41 @@ struct D3DBuffer
 //    cb.staging.var = ...; | cb->var = ... ; 
 //    cb.CopyStagingToGPU(...);
 template <class T>
-class ConstantBuffer : public GpuUploadBuffer
+class ConstantBuffer : public GPUUploadBuffer
 {
-    UINT8* m_mappedConstantData = nullptr;
-    UINT m_alignedInstanceSize;
-    UINT m_numInstances;
-
 public:
-    ConstantBuffer() : m_alignedInstanceSize(0), m_numInstances(0), m_mappedConstantData(nullptr) {}
+    ConstantBuffer() = default;
 
-    void Create(ID3D12Device* device, UINT numInstances = 1, LPCWSTR resourceName = nullptr)
+    void Create(ID3D12Device* pDevice, UINT numInstances = 1, LPCWSTR resourceName = nullptr)
     {
-        m_numInstances = numInstances;
+        m_NumInstances = numInstances;
         UINT alignedSize = Align(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
         UINT bufferSize = numInstances * alignedSize;
-        Allocate(device, bufferSize, resourceName);
-        m_mappedConstantData = MapCpuWriteOnly();
+        Allocate(pDevice, bufferSize, resourceName);
+        m_pMappedConstantData = MapCpuWriteOnly();
     }
 
-    void CopyStagingToGpu(UINT instanceIndex = 0)
+    inline void CopyStagingToGpu(UINT instanceIndex = 0)
     {
-        memcpy(m_mappedConstantData + instanceIndex * m_alignedInstanceSize, &staging, sizeof(T));
+        memcpy(m_pMappedConstantData + instanceIndex * m_AlignedInstanceSize, &staging, sizeof(T));
     }
 
     // Accessors
-    T staging;
-    T* operator->() { return &staging; }
-    UINT NumInstances() { return m_numInstances; }
-    D3D12_GPU_VIRTUAL_ADDRESS GpuVirtualAddress(UINT instanceIndex = 0)
+    
+    inline T* operator->() { return &staging; }
+    inline UINT NumInstances() { return m_NumInstances; }
+    inline D3D12_GPU_VIRTUAL_ADDRESS GPUVirtualAddress(UINT instanceIndex = 0)
     {
-        return m_resource->GetGPUVirtualAddress() + instanceIndex * m_alignedInstanceSize;
+        return m_pResource->GetGPUVirtualAddress() + instanceIndex * m_AlignedInstanceSize;
     }
+
+public:
+    T staging;
+
+private:
+    UINT8* m_pMappedConstantData = nullptr;
+    UINT m_AlignedInstanceSize = 0;
+    UINT m_NumInstances = 0;
 };
 
 
@@ -308,39 +315,40 @@ public:
 //    cb.staging.var = ...; | cb->var = ... ; 
 //    cb.CopyStagingToGPU(...);
 template <class T>
-class StructuredBuffer : public GpuUploadBuffer
+class StructuredBuffer : public GPUUploadBuffer
 {
-    T* m_mappedBuffers;
-    std::vector<T> m_staging;
-    UINT m_numInstances;
-
 public:
     // Performance tip: Align structures on sizeof(float4) boundary.
     // Ref: https://developer.nvidia.com/content/understanding-structured-buffer-performance
     static_assert(sizeof(T) % 16 == 0, L"Align structure buffers on 16 byte boundary for performance reasons.");
 
-    StructuredBuffer() : m_mappedBuffers(nullptr), m_numInstances(0) {}
+    StructuredBuffer() = default;
 
-    void Create(ID3D12Device* device, UINT numElements, UINT numInstances = 1, LPCWSTR resourceName = nullptr)
+    void Create(ID3D12Device* pDevice, UINT numElements, UINT numInstances = 1, LPCWSTR resourceName = nullptr)
     {
-        m_staging.resize(numElements);
+        m_Staging.resize(numElements);
         UINT bufferSize = numInstances * numElements * sizeof(T);
-        Allocate(device, bufferSize, resourceName);
-        m_mappedBuffers = reinterpret_cast<T*>(MapCpuWriteOnly());
+        Allocate(pDevice, bufferSize, resourceName);
+        m_pMappedBuffers = reinterpret_cast<T*>(MapCpuWriteOnly());
     }
 
-    void CopyStagingToGpu(UINT instanceIndex = 0)
+    inline void CopyStagingToGpu(UINT instanceIndex = 0)
     {
-        memcpy(m_mappedBuffers + instanceIndex, &m_staging[0], InstanceSize());
+        memcpy(m_pMappedBuffers + instanceIndex, &m_Staging[0], InstanceSize());
     }
 
     // Accessors
-    inline T& operator[](UINT elementIndex) { return m_staging[elementIndex]; }
-    inline SIZE_T NumElementsPerInstance() { return m_staging.size(); }
-    inline UINT NumInstances() { return m_staging.size(); }
+    inline T& operator[](UINT elementIndex) { return m_Staging[elementIndex]; }
+    inline SIZE_T NumElementsPerInstance() { return m_Staging.size(); }
+    inline UINT NumInstances() { return m_Staging.size(); }
     inline SIZE_T InstanceSize() { return NumElementsPerInstance() * sizeof(T); }
     inline D3D12_GPU_VIRTUAL_ADDRESS GpuVirtualAddress(UINT instanceIndex = 0)
     {
-        return m_resource->GetGPUVirtualAddress() + instanceIndex * InstanceSize();
+        return m_pResource->GetGPUVirtualAddress() + instanceIndex * InstanceSize();
     }
+
+private:
+    T* m_pMappedBuffers = nullptr;
+    std::vector<T> m_Staging;
+    UINT m_NumInstances = 0;
 };

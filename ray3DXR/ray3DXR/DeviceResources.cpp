@@ -752,7 +752,7 @@ void DeviceResources::InitializeAdapter(IDXGIAdapter1** ppAdapter)
         if (SUCCEEDED(D3D12CreateDevice(pAdapter, m_D3DMinFeatureLevel, _uuidof(ID3D12Device), nullptr)))
         {
             m_AdapterID = adapterID;
-            m_AdapterDescription = desc.Description;
+            wcsncpy_s(m_AdapterDescription, 512, desc.Description, wcslen(desc.Description));
 #ifdef _DEBUG
             WCHAR buff[256];
             swprintf_s(buff, L"Direct3D Adapter (%u): VID:%04X, PID:%04X - %ls\n", adapterID, desc.VendorId, desc.DeviceId, desc.Description);

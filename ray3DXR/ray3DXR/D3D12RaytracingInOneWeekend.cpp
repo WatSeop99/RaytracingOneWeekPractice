@@ -49,12 +49,12 @@ namespace
 
 				Vertex v;
 				// spherical to cartesian
-				v.position.x = radius * sinf(phi) * cosf(theta);
-				v.position.y = radius * cosf(phi);
-				v.position.z = radius * sinf(phi) * sinf(theta);
+				v.Position.x = radius * sinf(phi) * cosf(theta);
+				v.Position.y = radius * cosf(phi);
+				v.Position.z = radius * sinf(phi) * sinf(theta);
 
-				XMVECTOR p = XMLoadFloat3(&v.position);
-				XMStoreFloat3(&v.normal, XMVector3Normalize(p));
+				XMVECTOR p = XMLoadFloat3(&v.Position);
+				XMStoreFloat3(&v.Normal, XMVector3Normalize(p));
 
 				vertices.push_back(v);
 			}
@@ -491,12 +491,16 @@ void D3D12RaytracingInOneWeekend::BuildGeometry()
 	const int SLICE_COUNT = 16;
 	const int STACK_COUNT = 32;
 	{
-		std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1000, SLICE_COUNT, 512);
+		std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1000.0f, SLICE_COUNT, 512);
 
-		m_geometry.push_back(Geometry{ .Vertices = sphereGeometry.first, .Indices = sphereGeometry.second,
-			.Albedo = XMFLOAT4{ 0.5, 0.5, 0.5, 1.0 },
-			.MaterialID = LAMBERTIAN,
-			.Transform = XMMatrixTranspose(XMMatrixTranslation(0, -1000, 0)) });
+		Geometry geom;
+		geom.Vertices = sphereGeometry.first;
+		geom.Indices = sphereGeometry.second;
+		geom.Albedo = { 0.5f, 0.5f, 0.5f, 1.0f };
+		geom.MaterialID = LAMBERTIAN;
+		geom.Transform = XMMatrixTranspose(XMMatrixTranslation(0.0f, -1000.0f, 0.0f));
+
+		m_geometry.push_back(geom);
 	}
 
 	{
@@ -505,8 +509,8 @@ void D3D12RaytracingInOneWeekend::BuildGeometry()
 			for (int b = -11; b < 11; b++)
 			{
 				double choose_mat = random_double();
-				XMVECTOR center = { a + 0.9f * random_double(), 0.2f, b + 0.9f * random_double() };
-				XMVECTOR length = XMVector3Length(XMVectorSubtract(center, { 4, 0.2, 0 }));
+				XMVECTOR center = { (float)a + 0.9f * random_float(), 0.2f, (float)b + 0.9f * random_float() };
+				XMVECTOR length = XMVector3Length(XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
 				if (XMVectorGetX(length) > 0.9f)
 				{
 					XMVECTOR materialParameter;
@@ -537,38 +541,50 @@ void D3D12RaytracingInOneWeekend::BuildGeometry()
 					XMFLOAT4 float4Material;
 					XMStoreFloat4(&float4Material, materialParameter);
 
-					m_geometry.push_back(Geometry{ .Vertices = sphereGeometry.first, .Indices = sphereGeometry.second,
-						.Albedo = float4Material,
-						.MaterialID = materialType,
-						.Transform = XMMatrixTranspose(XMMatrixTranslationFromVector(center)) });
+					Geometry geom;
+					geom.Vertices = sphereGeometry.first;
+					geom.Indices = sphereGeometry.second;
+					geom.Albedo = float4Material;
+					geom.MaterialID = materialType;
+					geom.Transform = XMMatrixTranspose(XMMatrixTranslationFromVector(center));
+					m_geometry.push_back(geom);
 				}
 			}
 		}
 		{
-			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0, SLICE_COUNT, STACK_COUNT);
+			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
 
-			m_geometry.push_back(Geometry{ .Vertices = sphereGeometry.first, .Indices = sphereGeometry.second,
-				.Albedo = { 1.5, 1.5, 1.5, 1.5 },
-				.MaterialID = DIELECTRIC,
-				.Transform = XMMatrixTranspose(XMMatrixTranslation(0, 1, 0)) });
+			Geometry geom;
+			geom.Vertices = sphereGeometry.first;
+			geom.Indices = sphereGeometry.second;
+			geom.Albedo = { 1.5f, 1.5f, 1.5f, 1.5f };
+			geom.MaterialID = DIELECTRIC;
+			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+			m_geometry.push_back(geom);
 		}
 
 		{
 			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
 
-			m_geometry.push_back(Geometry{ .Vertices = sphereGeometry.first, .Indices = sphereGeometry.second,
-				.Albedo = { 0.4, 0.2, 0.1, 0.0 },
-				.MaterialID = LAMBERTIAN,
-				.Transform = XMMatrixTranspose(XMMatrixTranslation(-4, 1, 0)) });
+			Geometry geom;
+			geom.Vertices = sphereGeometry.first;
+			geom.Indices = sphereGeometry.second;
+			geom.Albedo = { 0.4f, 0.2f, 0.1f, 0.0f };
+			geom.MaterialID = LAMBERTIAN;
+			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(-4.0f, 1.0f, 0.0f));
+			m_geometry.push_back(geom);
 		}
 
 		{
 			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
 
-			m_geometry.push_back(Geometry{ .Vertices = sphereGeometry.first, .Indices = sphereGeometry.second,
-				.Albedo = { 0.7, 0.6, 0.5, 0.0 },
-				.MaterialID = METALLIC,
-				.Transform = XMMatrixTranspose(XMMatrixTranslation(4, 1, 0)) });
+			Geometry geom;
+			geom.Vertices = sphereGeometry.first;
+			geom.Indices = sphereGeometry.second;
+			geom.Albedo = { 0.7f, 0.6f, 0.5f, 0.0f };
+			geom.MaterialID = METALLIC;
+			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(4.0f, 1.0f, 0.0f));
+			m_geometry.push_back(geom);
 		}
 	}
 
@@ -602,8 +618,8 @@ void D3D12RaytracingInOneWeekend::BuildGeometry()
 
 	// Vertex buffer is passed to the shader along with index buffer as a descriptor table.
 	// Vertex buffer descriptor must follow index buffer descriptor in the descriptor heap.
-	UINT descriptorIndexIB = CreateBufferSRV(&m_IndexBuffer, indices.size(), sizeof(INT));
-	UINT descriptorIndexVB = CreateBufferSRV(&m_VertexBuffer, vertices.size(), sizeof(vertices[0]));
+	UINT descriptorIndexIB = CreateBufferSRV(&m_IndexBuffer, (UINT)indices.size(), sizeof(INT));
+	UINT descriptorIndexVB = CreateBufferSRV(&m_VertexBuffer, (UINT)vertices.size(), sizeof(vertices[0]));
 	ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index!");
 }
 
@@ -630,7 +646,7 @@ void D3D12RaytracingInOneWeekend::BuildAccelerationStructures()
 		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 		geometryDesc.Triangles.VertexBuffer.StartAddress = m_VertexBuffer.pResource->GetGPUVirtualAddress() + geometry.VerticesOffsetInBytes;
-		geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(geometry.Vertices[0]);
+		geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 		geometryDesc.Triangles.VertexCount = (UINT)geometry.Vertices.size();
 		geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 
@@ -706,7 +722,7 @@ void D3D12RaytracingInOneWeekend::BuildAccelerationStructures()
 
 	// Top Level Acceleration Structure desc
 	ID3D12Resource* pInstanceDescs = nullptr;
-	AllocateUploadBuffer(m_pDeviceResources->GetD3DDevice(), instanceDescriptors.data(), sizeof(instanceDescriptors[0]) * instanceDescriptors.size(),
+	AllocateUploadBuffer(m_pDeviceResources->GetD3DDevice(), instanceDescriptors.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(),
 						 &pInstanceDescs, L"InstanceDescs");
 
 	topLevelBuildDesc.DestAccelerationStructureData = m_pTopLevelAccelerationStructure->GetGPUVirtualAddress();
@@ -761,8 +777,8 @@ void D3D12RaytracingInOneWeekend::BuildShaderTables()
 		UINT numShaderRecords = 1;
 		UINT shaderRecordSize = shaderIdentifierSize;
 		ShaderTable rayGenShaderTable(pDevice, numShaderRecords, shaderRecordSize, L"RayGenShaderTable");
-		rayGenShaderTable.push_back(ShaderRecord(pRayGenShaderIdentifier, shaderIdentifierSize));
-		m_pRayGenShaderTable = rayGenShaderTable.GetResource().Get();
+		rayGenShaderTable.PushBack(ShaderRecord(pRayGenShaderIdentifier, shaderIdentifierSize));
+		m_pRayGenShaderTable = rayGenShaderTable.GetResource();
 		m_pRayGenShaderTable->AddRef();
 	}
 
@@ -771,8 +787,8 @@ void D3D12RaytracingInOneWeekend::BuildShaderTables()
 		UINT numShaderRecords = 1;
 		UINT shaderRecordSize = shaderIdentifierSize;
 		ShaderTable missShaderTable(pDevice, numShaderRecords, shaderRecordSize, L"MissShaderTable");
-		missShaderTable.push_back(ShaderRecord(pMissShaderIdentifier, shaderIdentifierSize));
-		m_pMissShaderTable = missShaderTable.GetResource().Get();
+		missShaderTable.PushBack(ShaderRecord(pMissShaderIdentifier, shaderIdentifierSize));
+		m_pMissShaderTable = missShaderTable.GetResource();
 		m_pMissShaderTable->AddRef();
 	}
 
@@ -789,14 +805,14 @@ void D3D12RaytracingInOneWeekend::BuildShaderTables()
 		for (SIZE_T i = 0, size = m_geometry.size(); i < size; ++i)
 		{
 			MeshBuffer meshBuffer;
-			meshBuffer.meshId = i;
-			meshBuffer.materialId = m_geometry[i].MaterialID;
-			meshBuffer.albedo = m_geometry[i].Albedo;
-			meshBuffer.verticesOffset = verticesOffset;
-			meshBuffer.indicesOffset = indicesOffset;
+			meshBuffer.MeshID = (int)i;
+			meshBuffer.MaterialID = m_geometry[i].MaterialID;
+			meshBuffer.Albedo = m_geometry[i].Albedo;
+			meshBuffer.VerticesOffset = verticesOffset;
+			meshBuffer.IndicesOffset = indicesOffset;
 
-			verticesOffset += m_geometry[i].Vertices.size();
-			indicesOffset += m_geometry[i].Indices.size();
+			verticesOffset += (UINT)m_geometry[i].Vertices.size();
+			indicesOffset += (UINT)m_geometry[i].Indices.size();
 
 			args.push_back(meshBuffer);
 		}
@@ -806,10 +822,10 @@ void D3D12RaytracingInOneWeekend::BuildShaderTables()
 		ShaderTable hitGroupShaderTable(pDevice, numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
 		for (MeshBuffer& arg : args)
 		{
-			hitGroupShaderTable.push_back(ShaderRecord(pHitGroupShaderIdentifier, shaderIdentifierSize, &arg, sizeof(MeshBuffer)));
+			hitGroupShaderTable.PushBack(ShaderRecord(pHitGroupShaderIdentifier, shaderIdentifierSize, &arg, sizeof(MeshBuffer)));
 		}
 
-		m_pHitGroupShaderTable = hitGroupShaderTable.GetResource().Get();
+		m_pHitGroupShaderTable = hitGroupShaderTable.GetResource();
 		m_pHitGroupShaderTable->AddRef();
 	}
 }
