@@ -211,7 +211,7 @@ void D3D12RaytracingInOneWeekend::CreateConstantBuffers()
 	// Map the constant buffer and cache its heap pointers.
 	// We don't unmap this until the app closes. Keeping buffer mapped for the lifetime of the resource is okay.
 	CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-	ThrowIfFailed(m_pPerFrameConstants->Map(0, nullptr, reinterpret_cast<void**>(&m_pMappedConstantData)));
+	ThrowIfFailed(m_pPerFrameConstants->Map(0, nullptr, (void**)&m_pMappedConstantData));
 }
 
 // Create resources that depend on the device.
@@ -425,7 +425,7 @@ void D3D12RaytracingInOneWeekend::CreateRaytracingOutputResource()
 	
 	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	pDevice->CreateUnorderedAccessView(m_pRaytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+	pDevice->CreateUnorderedAccessView(m_pRaytracingOutput, nullptr, &UAVDesc, uavDescriptorHandle);
 	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_pDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_DescriptorSize);
 }
 
@@ -860,8 +860,8 @@ void D3D12RaytracingInOneWeekend::DoRaytracing()
 	pCommandList->SetComputeRootSignature(m_pRaytracingGlobalRootSignature);
 
 	// Copy the updated scene constant buffer to GPU.
-	memcpy(&m_pMappedConstantData[frameIndex].Constants, &m_FrameCB[frameIndex], sizeof(m_FrameCB[frameIndex]));
-	ULONGLONG cbGpuAddress = m_pPerFrameConstants->GetGPUVirtualAddress() + frameIndex * sizeof(m_pMappedConstantData[0]);
+	memcpy(&m_pMappedConstantData[frameIndex].Constants, &m_FrameCB[frameIndex], sizeof(FrameBuffer));
+	ULONGLONG cbGpuAddress = m_pPerFrameConstants->GetGPUVirtualAddress() + frameIndex * sizeof(AlignedSceneConstantBuffer);
 	pCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
 
 	// Bind the heaps, acceleration structure and dispatch rays.
@@ -902,14 +902,14 @@ void D3D12RaytracingInOneWeekend::CopyRaytracingOutputToBackbuffer()
 
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
 	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	pCommandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
 
-	pCommandList->CopyResource(pRenderTarget, m_pRaytracingOutput.Get());
+	pCommandList->CopyResource(pRenderTarget, m_pRaytracingOutput);
 
 	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
 	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pRenderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	pCommandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
 }
@@ -924,17 +924,26 @@ void D3D12RaytracingInOneWeekend::CreateWindowSizeDependentResources()
 // Release resources that are dependent on the size of the main window.
 void D3D12RaytracingInOneWeekend::ReleaseWindowSizeDependentResources()
 {
-	/*if (m_pRaytracingOutput)
+	if (m_pRaytracingOutput)
 	{
 		ULONG ref = m_pRaytracingOutput->Release();
 		m_pRaytracingOutput = nullptr;
-	}*/
-	m_pRaytracingOutput.Reset();
+	}
+	//m_pRaytracingOutput.Reset();
 }
 
 // Release all resources that depend on the device.
 void D3D12RaytracingInOneWeekend::ReleaseDeviceDependentResources()
 {
+	for (auto& geometry : m_geometry)
+	{
+		if (geometry.pBottomLevelAccelerationStructure)
+		{
+			geometry.pBottomLevelAccelerationStructure->Release();
+			geometry.pBottomLevelAccelerationStructure = nullptr;
+		}
+	}
+
 	if (m_pRaytracingGlobalRootSignature)
 	{
 		m_pRaytracingGlobalRootSignature->Release();
@@ -955,6 +964,9 @@ void D3D12RaytracingInOneWeekend::ReleaseDeviceDependentResources()
 	m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 	if (m_pPerFrameConstants)
 	{
+		m_pPerFrameConstants->Unmap(0, nullptr);
+		m_pMappedConstantData = nullptr;
+
 		m_pPerFrameConstants->Release();
 		m_pPerFrameConstants = nullptr;
 	}
@@ -987,15 +999,6 @@ void D3D12RaytracingInOneWeekend::ReleaseDeviceDependentResources()
 	{
 		m_pTopLevelAccelerationStructure->Release();
 		m_pTopLevelAccelerationStructure = nullptr;
-	}
-
-	for (auto& geometry : m_geometry)
-	{
-		if (geometry.pBottomLevelAccelerationStructure)
-		{
-			geometry.pBottomLevelAccelerationStructure->Release();
-			geometry.pBottomLevelAccelerationStructure = nullptr;
-		}
 	}
 	
 	if (m_pDXRCommandList)

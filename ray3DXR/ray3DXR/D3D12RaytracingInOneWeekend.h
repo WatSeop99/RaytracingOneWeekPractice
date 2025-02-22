@@ -150,8 +150,8 @@ private:
 	D3DBuffer m_IndexBuffer = INIT_BUFFER;
 
 	// Raytracing output
-	ComPtr<ID3D12Resource> m_pRaytracingOutput = nullptr;
-	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
+	ID3D12Resource* m_pRaytracingOutput = nullptr;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor = { 0xFFFFFFFFFFFFFFFF };
 	UINT m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
 	// Shader tables

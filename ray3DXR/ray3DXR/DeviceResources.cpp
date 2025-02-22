@@ -678,7 +678,6 @@ void DeviceResources::Present(D3D12_RESOURCE_STATES beforeState)
     else
     {
         ThrowIfFailed(hr);
-
         MoveToNextFrame();
     }
 }
@@ -687,6 +686,7 @@ void DeviceResources::Present(D3D12_RESOURCE_STATES beforeState)
 void DeviceResources::ExecuteCommandList()
 {
     ThrowIfFailed(m_pCommandList->Close());
+
     ID3D12CommandList* ppCommandLists[] = { m_pCommandList };
     m_pCommandQueue->ExecuteCommandLists(ARRAYSIZE(ppCommandLists), ppCommandLists);
 }
