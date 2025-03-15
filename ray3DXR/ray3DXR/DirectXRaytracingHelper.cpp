@@ -65,8 +65,7 @@ void AllocateUAVBuffer(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource*
 {
 	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
 	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	ThrowIfFailed(pDevice->CreateCommittedResource(
-		&uploadHeapProperties,
+	ThrowIfFailed(pDevice->CreateCommittedResource(&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&bufferDesc,
 		initialResourceState,
@@ -82,8 +81,7 @@ void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, I
 {
 	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
 	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-	ThrowIfFailed(pDevice->CreateCommittedResource(
-		&uploadHeapProperties,
+	ThrowIfFailed(pDevice->CreateCommittedResource(&uploadHeapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&bufferDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -222,20 +220,23 @@ void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* pDesc)
 
 bool IsDirectXRaytracingSupported(IDXGIAdapter1* pAdapter)
 {
+	HRESULT hr;
 	ID3D12Device* pTestDevice = nullptr;
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
 
-	if (FAILED(D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pTestDevice))))
+	hr = D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pTestDevice));
+	if (FAILED(hr))
 	{
-		return false;
-	}
-	if(FAILED(pTestDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
-	{
-		pTestDevice->Release();
 		return false;
 	}
 
-	pTestDevice->Release();
+	hr = pTestDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData));
+	ULONG ref = pTestDevice->Release();
+	pTestDevice = nullptr;
+	if (FAILED(hr))
+	{
+		return false;
+	}
 
 	return (featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
 }

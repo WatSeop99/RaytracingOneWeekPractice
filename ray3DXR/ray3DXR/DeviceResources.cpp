@@ -72,58 +72,58 @@ DeviceResources::~DeviceResources()
     {
         if (m_ppCommandAllocators[n])
         {
-            m_ppCommandAllocators[n]->Release();
+            ULONG ref = m_ppCommandAllocators[n]->Release();
             m_ppCommandAllocators[n] = nullptr;
         }
         if (m_ppRenderTargets[n])
         {
-            m_ppRenderTargets[n]->Release();
+            ULONG ref = m_ppRenderTargets[n]->Release();
             m_ppRenderTargets[n] = nullptr;
         }
     }
     if (m_pDepthStencil)
     {
-        m_pDepthStencil->Release();
+        ULONG ref = m_pDepthStencil->Release();
         m_pDepthStencil = nullptr;
     }
     if (m_pFence)
     {
-        m_pFence->Release();
+        ULONG ref = m_pFence->Release();
         m_pFence = nullptr;
     }
     if (m_pRTVDescriptorHeap)
     {
-        m_pRTVDescriptorHeap->Release();
+        ULONG ref = m_pRTVDescriptorHeap->Release();
         m_pRTVDescriptorHeap = nullptr;
     }
     if (m_pDSVDescriptorHeap)
     {
-        m_pDSVDescriptorHeap->Release();
+        ULONG ref = m_pDSVDescriptorHeap->Release();
         m_pDSVDescriptorHeap = nullptr;
     }
     if (m_pCommandList)
     {
-        m_pCommandList->Release();
+        ULONG ref = m_pCommandList->Release();
         m_pCommandList = nullptr;
     }
     if (m_pCommandQueue)
     {
-        m_pCommandQueue->Release();
+        ULONG ref = m_pCommandQueue->Release();
         m_pCommandQueue = nullptr;
     }
     if (m_pSwapChain)
     {
-        m_pSwapChain->Release();
+        ULONG ref = m_pSwapChain->Release();
         m_pSwapChain = nullptr;
     }
     if (m_pDXGIFactory)
     {
-        m_pDXGIFactory->Release();
+        ULONG ref = m_pDXGIFactory->Release();
         m_pDXGIFactory = nullptr;
     }
     if (m_pAdapter)
     {
-        m_pAdapter->Release();
+        ULONG ref = m_pAdapter->Release();
         m_pAdapter = nullptr;
     }
     if (m_pD3DDevice)
@@ -133,7 +133,7 @@ DeviceResources::~DeviceResources()
         {
             __debugbreak();
         }*/
-        m_pD3DDevice->Release();
+        ULONG ref = m_pD3DDevice->Release();
         m_pD3DDevice = nullptr;
     }
 }
@@ -602,16 +602,14 @@ void DeviceResources::HandleDeviceLost()
     }
 
 #ifdef _DEBUG
-    {
-        IDXGIDebug1* pDXGIDebug = nullptr;
-        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDXGIDebug))))
-        {
-            pDXGIDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+	IDXGIDebug1* pDXGIDebug = nullptr;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDXGIDebug))))
+	{
+		pDXGIDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 
-            pDXGIDebug->Release();
-            pDXGIDebug = nullptr;
-        }
-    }
+		pDXGIDebug->Release();
+		pDXGIDebug = nullptr;
+	}
 #endif
     InitializeDXGIAdapter();
     CreateDeviceResources();

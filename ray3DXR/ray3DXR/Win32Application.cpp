@@ -174,14 +174,13 @@ void Win32Application::SetWindowZorderToTopMost(bool setToTopMost)
     RECT windowRect = {};
     GetWindowRect(ms_hWnd, &windowRect);
 
-    SetWindowPos(
-        ms_hWnd,
-        (setToTopMost ? HWND_TOPMOST : HWND_NOTOPMOST),
-        windowRect.left,
-        windowRect.top,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top,
-        SWP_FRAMECHANGED | SWP_NOACTIVATE);
+	SetWindowPos(ms_hWnd,
+				 (setToTopMost ? HWND_TOPMOST : HWND_NOTOPMOST),
+				 windowRect.left,
+				 windowRect.top,
+				 windowRect.right - windowRect.left,
+				 windowRect.bottom - windowRect.top,
+				 SWP_FRAMECHANGED | SWP_NOACTIVATE);
 }
 
 // Main message handler for the sample.

@@ -200,13 +200,12 @@ void D3D12RaytracingInOneWeekend::CreateConstantBuffers()
 	SIZE_T cbSize = frameCount * sizeof(AlignedSceneConstantBuffer);
 	const D3D12_RESOURCE_DESC CONSTANT_BUFFER_DESC = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
 
-	ThrowIfFailed(pDevice->CreateCommittedResource(
-		&UPLOAD_HEAP_PROPERTIES,
-		D3D12_HEAP_FLAG_NONE,
-		&CONSTANT_BUFFER_DESC,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_pPerFrameConstants)));
+	ThrowIfFailed(pDevice->CreateCommittedResource(&UPLOAD_HEAP_PROPERTIES,
+												   D3D12_HEAP_FLAG_NONE,
+												   &CONSTANT_BUFFER_DESC,
+												   D3D12_RESOURCE_STATE_GENERIC_READ,
+												   nullptr,
+												   IID_PPV_ARGS(&m_pPerFrameConstants)));
 
 	// Map the constant buffer and cache its heap pointers.
 	// We don't unmap this until the app closes. Keeping buffer mapped for the lifetime of the resource is okay.
@@ -275,8 +274,6 @@ void D3D12RaytracingInOneWeekend::SerializeAndCreateRaytracingRootSignature(D3D1
 
 void D3D12RaytracingInOneWeekend::CreateRootSignatures()
 {
-	ID3D12Device* pDevice = m_pDeviceResources->GetD3DDevice();
-
 	// Global Root Signature
 	// This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
 	{
@@ -935,29 +932,29 @@ void D3D12RaytracingInOneWeekend::ReleaseWindowSizeDependentResources()
 // Release all resources that depend on the device.
 void D3D12RaytracingInOneWeekend::ReleaseDeviceDependentResources()
 {
-	for (auto& geometry : m_geometry)
+	for (Geometry& geometry : m_geometry)
 	{
 		if (geometry.pBottomLevelAccelerationStructure)
 		{
-			geometry.pBottomLevelAccelerationStructure->Release();
+			ULONG ref = geometry.pBottomLevelAccelerationStructure->Release();
 			geometry.pBottomLevelAccelerationStructure = nullptr;
 		}
 	}
 
 	if (m_pRaytracingGlobalRootSignature)
 	{
-		m_pRaytracingGlobalRootSignature->Release();
+		ULONG ref = m_pRaytracingGlobalRootSignature->Release();
 		m_pRaytracingGlobalRootSignature = nullptr;
 	}
 	if (m_pRaytracingLocalRootSignature)
 	{
-		m_pRaytracingLocalRootSignature->Release();
+		ULONG ref = m_pRaytracingLocalRootSignature->Release();
 		m_pRaytracingLocalRootSignature = nullptr;
 	}
 
 	if (m_pDescriptorHeap)
 	{
-		m_pDescriptorHeap->Release();
+		ULONG ref = m_pDescriptorHeap->Release();
 		m_pDescriptorHeap = nullptr;
 	}
 	m_DescriptorsAllocated = 0;
@@ -967,53 +964,53 @@ void D3D12RaytracingInOneWeekend::ReleaseDeviceDependentResources()
 		m_pPerFrameConstants->Unmap(0, nullptr);
 		m_pMappedConstantData = nullptr;
 
-		m_pPerFrameConstants->Release();
+		ULONG ref = m_pPerFrameConstants->Release();
 		m_pPerFrameConstants = nullptr;
 	}
 	if (m_pRayGenShaderTable)
 	{
-		m_pRayGenShaderTable->Release();
+		ULONG ref = m_pRayGenShaderTable->Release();
 		m_pRayGenShaderTable = nullptr;
 	}
 	if (m_pMissShaderTable)
 	{
-		m_pMissShaderTable->Release();
+		ULONG ref = m_pMissShaderTable->Release();
 		m_pMissShaderTable = nullptr;
 	}
 	if (m_pHitGroupShaderTable)
 	{
-		m_pHitGroupShaderTable->Release();
+		ULONG ref = m_pHitGroupShaderTable->Release();
 		m_pHitGroupShaderTable = nullptr;
 	}
 	if (m_IndexBuffer.pResource)
 	{
-		m_IndexBuffer.pResource->Release();
+		ULONG ref = m_IndexBuffer.pResource->Release();
 		m_IndexBuffer.pResource = nullptr;
 	}
 	if (m_VertexBuffer.pResource)
 	{
-		m_VertexBuffer.pResource->Release();
+		ULONG ref = m_VertexBuffer.pResource->Release();
 		m_VertexBuffer.pResource = nullptr;
 	}
 	if (m_pTopLevelAccelerationStructure)
 	{
-		m_pTopLevelAccelerationStructure->Release();
+		ULONG ref = m_pTopLevelAccelerationStructure->Release();
 		m_pTopLevelAccelerationStructure = nullptr;
 	}
 	
 	if (m_pDXRCommandList)
 	{
-		m_pDXRCommandList->Release();
+		ULONG ref = m_pDXRCommandList->Release();
 		m_pDXRCommandList = nullptr;
 	}
 	if (m_pDXRStateObject)
 	{
-		m_pDXRStateObject->Release();
+		ULONG ref = m_pDXRStateObject->Release();
 		m_pDXRStateObject = nullptr;
 	}
 	if (m_pDXRDevice)
 	{
-		m_pDXRDevice->Release();
+		ULONG ref = m_pDXRDevice->Release();
 		m_pDXRDevice = nullptr;
 	}
 }
