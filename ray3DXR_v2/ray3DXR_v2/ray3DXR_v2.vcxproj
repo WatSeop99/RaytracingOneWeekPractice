@@ -131,6 +131,7 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GeometryUtil.h" />
+    <ClInclude Include="GPUResources.h" />
     <ClInclude Include="HLSLCompat.h" />
     <ClInclude Include="MathUtil.h" />
     <ClInclude Include="ray3DXR_v2.h" />
@@ -142,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GeometryUtil.cpp" />
+    <ClCompile Include="GPUResources.cpp" />
     <ClCompile Include="MathUtil.cpp" />
     <ClCompile Include="ray3DXR_v2.cpp" />
     <ClCompile Include="Renderer.cpp" />

@@ -45,8 +45,12 @@ private:
 	void UpdateCameraMatrices();
 
 	void DoRaytracing();
+	void ExecuteCommandList();
 
 	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC* pDesc, ID3D12RootSignature** ppRootSig);
+
+	void Fence();
+	void WaitForGPU();
 
 private:
 	HWND m_hMainWindow = nullptr;
@@ -86,7 +90,9 @@ private:
 	UINT m_DSVDescriptorSize = 0;
 	UINT m_CBVSRVUAVDescriptorSize = 0;
 	
+	UINT m_RaytracingOutputResourceUAVDescriptorHeapIndex = 0xFFFFFFFF;
 	ID3D12Resource2* m_pRaytracingOutput = nullptr;
+	ID3D12Resource2* m_pTopLevelAccelerationStructure = nullptr;
 
 	ID3D12StateObject* m_pStateObject = nullptr;
 	ID3D12RootSignature* m_pRaytracingGlobalRootSignature = nullptr;

@@ -54,6 +54,9 @@
     <ClInclude Include="MathUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GPUResources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ray3DXR_v2.cpp">
@@ -69,6 +72,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MathUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUResources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
