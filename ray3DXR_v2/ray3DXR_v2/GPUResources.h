@@ -3,7 +3,7 @@
 class GPUUploadBuffer
 {
 public:
-    inline ID3D12Resource* GetResource() { return m_pResource; }
+    inline ID3D12Resource2* GetResource() { return m_pResource; }
 
 protected:
     GPUUploadBuffer() = default;
@@ -14,7 +14,7 @@ protected:
     BYTE* MapCPUWriteOnly();
 
 protected:
-    ID3D12Resource* m_pResource = nullptr;
+    ID3D12Resource2* m_pResource = nullptr;
 };
 
 
@@ -51,6 +51,7 @@ class ShaderTable final : public GPUUploadBuffer
 {
 public:
 	ShaderTable(ID3D12Device* pDevice, UINT numShaderRecords, UINT shaderRecordSize, LPCWSTR pszResourceName = nullptr);
+	~ShaderTable() = default;
 
 	void PushBack(const ShaderRecord& shaderRecord);
 
@@ -61,7 +62,6 @@ public:
 
 private:
 	ShaderTable() = default;
-	~ShaderTable() = default;
 
 private:
 	BYTE* m_pMappedShaderRecords = nullptr;

@@ -1511,7 +1511,7 @@ void Renderer::Present(D3D12_RESOURCE_STATES beforeState)
 	if (beforeState != D3D12_RESOURCE_STATE_PRESENT)
 	{
 		// Transition the render target to the state that allows it to be presented to the display.
-		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_ppRenderTargets[m_BackBufferIndex], beforeState, D3D12_RESOURCE_STATE_PRESENT);
+		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_ppRenderTargets[m_FrameIndex], beforeState, D3D12_RESOURCE_STATE_PRESENT);
 		m_ppCommandLists[m_FrameIndex]->ResourceBarrier(1, &barrier);
 	}
 
