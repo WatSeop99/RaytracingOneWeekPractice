@@ -1,4 +1,5 @@
 #include "framework.h"
+#include "D3DUtil.h"
 #include "GeometryUtil.h"
 #include "GPUResources.h"
 #include "MathUtil.h"
@@ -9,9 +10,77 @@ const WCHAR* szRAYGEN_SHADER_NAME = L"MyRaygenShader";
 const WCHAR* szCLOSEST_HIT_SHADER_NAME = L"MyClosestHitShader";
 const WCHAR* szMISS_SHADER_NAME = L"MyMissShader";
 
+bool Renderer::Initialize(HINSTANCE hInstance, WNDPROC pfnWndProc, UINT width, UINT height)
+{
+	if (!hInstance || hInstance == INVALID_HANDLE_VALUE)
+	{
+		return false;
+	}
+	if (!pfnWndProc)
+	{
+		return false;
+	}
+	if (width == 0 || height == 0)
+	{
+		return false;
+	}
+
+	m_Width = width;
+	m_Height = height;
+	m_AspectRatio = (float)width / (float)height;
+
+	// Create windows.
+	{
+		WNDCLASSEX windowClass = { 0, };
+		windowClass.cbSize = sizeof(WNDCLASSEX);
+		windowClass.style = CS_HREDRAW | CS_VREDRAW;
+		windowClass.lpfnWndProc = pfnWndProc;
+		windowClass.hInstance = hInstance;
+		windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
+		windowClass.lpszClassName = L"DXRClass";
+		if (!RegisterClassEx(&windowClass))
+		{
+			return false;
+		}
+
+		RECT windowRect = { 0, 0, (long)width, (long)height };
+		AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+		// Create the window and store a handle to it.
+		m_hMainWindow = CreateWindow(windowClass.lpszClassName,
+									 L"DXRRenderer",
+									 WS_OVERLAPPEDWINDOW,
+									 CW_USEDEFAULT,
+									 CW_USEDEFAULT,
+									 windowRect.right - windowRect.left,
+									 windowRect.bottom - windowRect.top,
+									 nullptr,        // We have no parent window.
+									 nullptr,        // We aren't using menus.
+									 hInstance,
+									 this);
+		if (!m_hMainWindow)
+		{
+			return false;
+		}
+	}
+
+	if (!InitializeDXGIAdapter())
+	{
+		return false;
+	}
+
+	if (!InitializeD3DDeviceResources())
+	{
+		return false;
+	}
+
+	return true;
+}
+
 bool Renderer::Cleanup()
 {
 	// wait for gpu.
+	WaitForGPU();
 
 	if (m_hFenceEvent)
 	{
@@ -47,9 +116,9 @@ bool Renderer::Cleanup()
 	SAFE_COM_RELEASE(m_pTopLevelAccelerationStructure);
 	SAFE_COM_RELEASE(m_pRaytracingOutput);
 
-	m_RTVDescriptorSize = 0;
-	m_DSVDescriptorSize = 0;
-	m_CBVSRVUAVDescriptorSize = 0;
+	m_NumRTVDescriptorAlloced = 0;
+	m_NumDSVDescriptorAlloced = 0;
+	m_NumCBVSRVUAVDescriptorAlloced = 0;
 	SAFE_COM_RELEASE(m_pCBVSRVUAVDescriptorHeap);
 	SAFE_COM_RELEASE(m_pDSVDescriptorHeap);
 	SAFE_COM_RELEASE(m_pRTVDescriptorHeap);
@@ -72,12 +141,131 @@ bool Renderer::Cleanup()
 	SAFE_COM_RELEASE(m_pSwapChain);
 	SAFE_COM_RELEASE(m_pDXGIAdapter);
 	SAFE_COM_RELEASE(m_pDXGIFactory);
-	SAFE_COM_RELEASE(m_pDevice);
 
 	DestroyWindow(m_hMainWindow);
 	m_hMainWindow = nullptr;
 
+	if (m_pDevice)
+	{
+		ULONG refCount = m_pDevice->Release();
+		m_pDevice = nullptr;
+
+		if (refCount > 0)
+		{
+			return false;
+		}
+	}
+
 	return true;
+}
+
+void Renderer::Run()
+{
+	_ASSERT(m_hMainWindow);
+
+	ShowWindow(m_hMainWindow, SW_SHOWNORMAL);
+	UpdateWindow(m_hMainWindow);
+
+	MSG msg = {};
+	while (TRUE)
+	{
+		if (PeekMessage(&msg, m_hMainWindow, 0, 0, PM_REMOVE))
+		{
+			if (msg.message == WM_QUIT)
+			{
+				break;
+			}
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			Update();
+			Render();
+		}
+	}
+}
+
+void Renderer::Update()
+{
+	_ASSERT(m_hMainWindow);
+
+	m_Timer.Tick();
+	//CalculateFrameStats();
+	{
+		static int s_FrameCnt = 0;
+		static double s_ElapsedTime = 0.0f;
+
+		double totalTime = m_Timer.GetTotalSeconds();
+		++s_FrameCnt;
+
+		// Compute averages over one second period.
+		if ((totalTime - s_ElapsedTime) >= 1.0f)
+		{
+			float diff = (float)(totalTime - s_ElapsedTime);
+			float fps = (float)s_FrameCnt / diff; // Normalize to an exact second.
+
+			s_FrameCnt = 0;
+			s_ElapsedTime = totalTime;
+
+			float MRaysPerSecond = (m_Width * m_Height * fps) / (float)1e6;
+
+			WCHAR szWindowText[512];
+			swprintf_s(szWindowText, 512, L"    fps: %d     ~Million Primary Rays/s: %f    GPU[%d]: %s", fps, MRaysPerSecond, m_AdapterID, m_AdapterDescription);
+			SetWindowText(m_hMainWindow, szWindowText);
+		}
+	}
+
+	float elapsedTime = (float)m_Timer.GetElapsedSeconds();
+
+	// Rotate the camera around Y axis.
+	float secondsToRotateAround = 60.0f;
+	float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+	XMMATRIX rotate = DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(angleToRotateBy));
+	m_Eye = DirectX::XMVector3Transform(m_Eye, rotate);
+	m_Up = DirectX::XMVector3Transform(m_Up, rotate);
+	m_At = DirectX::XMVector3Transform(m_At, rotate);
+	UpdateCameraMatrices();
+}
+
+void Renderer::Render()
+{
+	_ASSERT(m_hMainWindow);
+
+	// If window is invisible, just return functions.
+	long hwndStyle = GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
+	if (!(hwndStyle & WS_VISIBLE) || (hwndStyle & WS_MINIMIZE))
+	{
+		return;
+	}
+
+	Prepare();
+	DoRaytracing();
+	CopyRaytracingOutputToBackbuffer();
+
+	Present(D3D12_RESOURCE_STATE_PRESENT);
+}
+
+void Renderer::ChangeSize(UINT width, UINT height)
+{
+	_ASSERT(m_hMainWindow);
+
+	long hwndStyle = GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
+	if (hwndStyle & WS_MINIMIZE)
+	{
+		return;
+	}
+
+	m_Width = width;
+	m_Height = height;
+
+	ReleaseWindowDependentedResources();
+	if (!CreateWindowDependentedResources())
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+	}
 }
 
 bool Renderer::InitializeDXGIAdapter()
@@ -252,38 +440,13 @@ LB_EXIT_LOOP:
 			return false;
 		}
 
-
-		hr = m_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_ppRenderTargets[i]));
-		if (FAILED(hr))
-		{
-			BREAK_IF_FAILED(hr);
-			return false;
-		}
-
-		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-		rtvDesc.Format = m_BackBufferFormat;
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_pRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-		m_pDevice->CreateRenderTargetView(m_ppRenderTargets[i], &rtvDesc, rtvDescriptor);
-
-
 		WCHAR szDebugName[256];
 		swprintf_s(szDebugName, 256, L"CommandAllocator[%d]", i);
 		m_ppCommandAllocators[i]->SetName(szDebugName);
 		swprintf_s(szDebugName, 256, L"CommandList[%d]", i);
 		m_ppCommandLists[i]->SetName(szDebugName);
-		swprintf_s(szDebugName, 256, L"RenderTaget[%d]", i);
-		m_ppRenderTargets[i]->SetName(szDebugName);
 
 		m_ppCommandLists[i]->Close();
-	}
-
-
-	if (!CreateWindowDependentedResources())
-	{
-		__debugbreak();
-		return false;
 	}
 
 
@@ -298,6 +461,31 @@ LB_EXIT_LOOP:
 	if (!m_hFenceEvent || m_hFenceEvent == INVALID_HANDLE_VALUE)
 	{
 		BREAK_IF_FAILED(hr);
+		return false;
+	}
+
+
+	if (!CreateWindowDependentedResources())
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
+
+	if (!CreateDeviceDependentResources())
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
+
+	if (!CreateConstantBuffers())
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
 		return false;
 	}
 
@@ -356,12 +544,11 @@ bool Renderer::CreateWindowDependentedResources()
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(m_pRTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 		m_pDevice->CreateRenderTargetView(m_ppRenderTargets[i], &rtvDesc, rtvDescriptor);
+		++m_NumRTVDescriptorAlloced;
 
 		WCHAR szDebugName[256];
 		swprintf_s(szDebugName, 256, L"RenderTaget[%d]", i);
 		m_ppRenderTargets[i]->SetName(szDebugName);
-
-		m_ppCommandLists[i]->Close();
 	}
 
 	m_BackBufferFormat = swapChainDesc.Format;
@@ -370,8 +557,32 @@ bool Renderer::CreateWindowDependentedResources()
 	return true;
 }
 
+void Renderer::ReleaseWindowDependentedResources()
+{
+	for (UINT i = 0; i < MAX_BACK_BUFFER_COUNT; ++i)
+	{
+		if (m_ppRenderTargets[i])
+		{
+			m_ppRenderTargets[i]->Release();
+			m_ppRenderTargets[i] = nullptr;
+		}
+	}
+	m_NumRTVDescriptorAlloced = 0;
+
+	if (m_pSwapChain)
+	{
+		m_pSwapChain->Release();
+		m_pSwapChain = nullptr;
+	}
+
+	m_BackBufferFormat = DXGI_FORMAT_UNKNOWN;
+	m_FrameIndex = 0;
+}
+
 bool Renderer::CreateDeviceDependentResources()
 {
+	_ASSERT(m_pDevice);
+
 	if (!CreateRootSignature())
 	{
 		return false;
@@ -403,6 +614,10 @@ bool Renderer::CreateDeviceDependentResources()
 	}
 
 	// Create raytracing output reosurce.
+	if (m_pRaytracingOutput)
+	{
+		return false;
+	}
 	{
 		// Create the output resource.The dimensions and format should match the swap - chain.
 		CD3DX12_RESOURCE_DESC uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_BackBufferFormat, m_Width, m_Height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -428,40 +643,80 @@ bool Renderer::CreateDeviceDependentResources()
 		m_pDevice->CreateUnorderedAccessView(m_pRaytracingOutput, nullptr, &UAVDesc, uavDescriptorHandle);
 	}
 
-	
+
 	return true;
 }
 
 bool Renderer::CreateConstantBuffers()
 {
-	return false;
+	_ASSERT(m_pDevice);
+
+	if (m_pFrameConstants)
+	{
+		return false;
+	}
+
+	HRESULT hr;
+
+	const CD3DX12_HEAP_PROPERTIES UPLOAD_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	SIZE_T cbSize = MAX_BACK_BUFFER_COUNT * sizeof(AlignedSceneConstantBuffer);
+	const D3D12_RESOURCE_DESC CONSTANT_BUFFER_DESC = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
+
+	hr = m_pDevice->CreateCommittedResource(&UPLOAD_HEAP_PROPERTIES,
+											D3D12_HEAP_FLAG_NONE,
+											&CONSTANT_BUFFER_DESC,
+											D3D12_RESOURCE_STATE_GENERIC_READ,
+											nullptr,
+											IID_PPV_ARGS(&m_pFrameConstants));
+	if (FAILED(hr))
+	{
+		BREAK_IF_FAILED(hr);
+		return false;
+	}
+
+	CD3DX12_RANGE readRange(0, 0);
+	hr = (m_pFrameConstants->Map(0, nullptr, (void**)&m_pMappedConstantData));
+	if (FAILED(hr))
+	{
+		BREAK_IF_FAILED(hr);
+		return false;
+	}
+
+	return true;
 }
 
 bool Renderer::CreateRootSignature()
 {
-	_ASSERT(!m_pRaytracingGlobalRootSignature);
-	_ASSERT(!m_pRaytracingLocalRootSignature);
-
 	// Global Root Signature
+
+	if (m_pRaytracingGlobalRootSignature)
+	{
+		return false;
+	}
 
 	CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
 	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
 	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
-	CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
-	rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
-	rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
-	rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
-	rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
-	
+	CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams_Count];
+	rootParameters[GlobalRootSignatureParams_OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+	rootParameters[GlobalRootSignatureParams_AccelerationStructureSlot].InitAsShaderResourceView(0);
+	rootParameters[GlobalRootSignatureParams_SceneConstantSlot].InitAsConstantBufferView(0);
+	rootParameters[GlobalRootSignatureParams_VertexBufferSlot].InitAsDescriptorTable(1, &ranges[1]);
+
 	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 	SerializeAndCreateRaytracingRootSignature(&globalRootSignatureDesc, &m_pRaytracingGlobalRootSignature);
 
 	// Local Root Signature
 
-	CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-	rootParameters[LocalRootSignatureParams::MeshBufferSlot].InitAsConstants(sizeof(MeshBuffer), 1);
-	
+	if (m_pRaytracingLocalRootSignature)
+	{
+		return false;
+	}
+
+	CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams_Count];
+	rootParameters[LocalRootSignatureParams_MeshBufferSlot].InitAsConstants(sizeof(MeshBuffer), 1);
+
 	CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 	localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 	SerializeAndCreateRaytracingRootSignature(&localRootSignatureDesc, &m_pRaytracingLocalRootSignature);
@@ -502,11 +757,11 @@ bool Renderer::CreateRaytracingPipelineStateObject()
 	UINT maxRecursionDepth = 1; // ~ primary rays only. 
 	pPipelineConfig->Config(maxRecursionDepth);
 
-//#if _DEBUG
-//	PrintStateObjectDesc(raytracingPipeline);
-//#endif
+	//#if _DEBUG
+	//	PrintStateObjectDesc(raytracingPipeline);
+	//#endif
 
-	// Create the state object.
+		// Create the state object.
 	HRESULT hr = m_pDevice->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_pStateObject));
 	if (FAILED(hr))
 	{
@@ -523,7 +778,7 @@ void Renderer::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRa
 
 	CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT* pLocalRootSignature = pRaytracingPipeline->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
 	pLocalRootSignature->SetRootSignature(m_pRaytracingLocalRootSignature);
-	
+
 	CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT* pRootSignatureAssociation = pRaytracingPipeline->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
 	pRootSignatureAssociation->SetSubobjectToAssociate(*pLocalRootSignature);
 	pRootSignatureAssociation->AddExport(szHIT_GROUP_NAME);
@@ -538,14 +793,18 @@ bool Renderer::BuildGeometry()
 	const int SLICE_COUNT = 16;
 	const int STACK_COUNT = 32;
 	{
-		std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1000.0f, SLICE_COUNT, 512);
-
 		Geometry geom = {};
-		geom.Vertices = sphereGeometry.first;
-		geom.Indices = sphereGeometry.second;
+		if (!CreateSphere(1000.0f, SLICE_COUNT, 512, &geom.Vertices, &geom.Indices))
+		{
+#ifdef _DEBUG
+			__debugbreak();
+#endif
+			return false;
+		}
+
 		geom.Albedo = { 0.5f, 0.5f, 0.5f, 1.0f };
 		geom.MaterialID = LAMBERTIAN;
-		geom.Transform = XMMatrixTranspose(XMMatrixTranslation(0.0f, -1000.0f, 0.0f));
+		geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(0.0f, -1000.0f, 0.0f));
 
 		m_Geometry.push_back(geom);
 	}
@@ -556,18 +815,18 @@ bool Renderer::BuildGeometry()
 			for (int b = -11; b < 11; b++)
 			{
 				double chooseMat = RandomDouble();
-				XMVECTOR center = { (float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat() };
-				XMVECTOR length = XMVector3Length(XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
+				DirectX::XMVECTOR center = { (float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat() };
+				DirectX::XMVECTOR length = XMVector3Length(XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
 				if (XMVectorGetX(length) > 0.9f)
 				{
-					XMVECTOR materialParameter;
+					DirectX::XMVECTOR materialParameter;
 					int materialType = 0;
 
 					if (chooseMat < 0.8)
 					{
 						// diffuse
 						materialType = LAMBERTIAN;
-						XMVECTOR albedo = RandomColor() * RandomColor();
+						DirectX::XMVECTOR albedo = RandomColor() * RandomColor();
 						materialParameter = albedo;
 					}
 					else if (chooseMat < 0.95)
@@ -584,50 +843,66 @@ bool Renderer::BuildGeometry()
 						materialParameter = { 1.5, 1.5, 1.5, 1.5 };
 					}
 
-					std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT);
-					XMFLOAT4 float4Material;
-					XMStoreFloat4(&float4Material, materialParameter);
+					Geometry geom = {};
+					if (!CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+					{
+#ifdef _DEBUG
+						__debugbreak();
+#endif
+						return false;
+					}
+					DirectX::XMFLOAT4 float4Material;
+					DirectX::XMStoreFloat4(&float4Material, materialParameter);
 
-					Geometry geom;
-					geom.Vertices = sphereGeometry.first;
-					geom.Indices = sphereGeometry.second;
 					geom.Albedo = float4Material;
 					geom.MaterialID = materialType;
-					geom.Transform = XMMatrixTranspose(XMMatrixTranslationFromVector(center));
+					geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslationFromVector(center));
 					m_Geometry.push_back(geom);
 				}
 			}
 		}
 		{
-			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
+			Geometry geom = {};
+			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+			{
+#ifdef _DEBUG
+				__debugbreak();
+#endif
+				return false;
+			}
 
-			Geometry geom;
-			geom.Vertices = sphereGeometry.first;
-			geom.Indices = sphereGeometry.second;
 			geom.Albedo = { 1.5f, 1.5f, 1.5f, 1.5f };
 			geom.MaterialID = DIELECTRIC;
-			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(0.0f, 1.0f, 0.0f));
+			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(0.0f, 1.0f, 0.0f));
 			m_Geometry.push_back(geom);
 		}
 
 		{
-			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
+			Geometry geom = {};
+			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+			{
+#ifdef _DEBUG
+				__debugbreak();
+#endif
+				return false;
+			}
 
-			Geometry geom;
-			geom.Vertices = sphereGeometry.first;
-			geom.Indices = sphereGeometry.second;
 			geom.Albedo = { 0.4f, 0.2f, 0.1f, 0.0f };
 			geom.MaterialID = LAMBERTIAN;
-			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(-4.0f, 1.0f, 0.0f));
+			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(-4.0f, 1.0f, 0.0f));
 			m_Geometry.push_back(geom);
 		}
 
 		{
-			std::pair<std::vector<Vertex>, std::vector<UINT32>> sphereGeometry = CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT);
+			Geometry geom = {};
+			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+			{
+#ifdef _DEBUG
+				__debugbreak();
+#endif
+				return false;
+			}
 
-			Geometry geom;
-			geom.Vertices = sphereGeometry.first;
-			geom.Indices = sphereGeometry.second;
 			geom.Albedo = { 0.7f, 0.6f, 0.5f, 0.0f };
 			geom.MaterialID = METALLIC;
 			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(4.0f, 1.0f, 0.0f));
@@ -659,8 +934,20 @@ bool Renderer::BuildGeometry()
 		vertexOffset += geom.Vertices.size();
 		indexOffset += geom.Indices.size();
 	}
-	AllocateUploadBuffer(m_pDevice, vertices.data(), vertices.size() * sizeof(Vertex), &m_VertexBuffer.pResource);
-	AllocateUploadBuffer(m_pDevice, indices.data(), indices.size() * sizeof(UINT32), &m_IndexBuffer.pResource);
+	if (!AllocateUploadBuffer(vertices.data(), vertices.size() * sizeof(Vertex), (ID3D12Resource**)&m_VertexBuffer.pResource, L"VertexBuffer"))
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
+	if (!AllocateUploadBuffer(indices.data(), indices.size() * sizeof(UINT32), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
 
 
 	// Vertex buffer is passed to the shader along with index buffer as a descriptor table.
@@ -734,7 +1021,13 @@ bool Renderer::BuildAccelerationStructures()
 		}
 
 		D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-		AllocateUAVBuffer(m_pDevice, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &pBottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure");
+		if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)&pBottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure"))
+		{
+#ifdef _DEBUG
+			__debugbreak();
+#endif
+			return false;
+		}
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
@@ -746,7 +1039,13 @@ bool Renderer::BuildAccelerationStructures()
 		instanceDescriptors.push_back(instanceDesc);
 
 		ID3D12Resource* pScratchResource = nullptr;
-		AllocateUAVBuffer(m_pDevice, bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource");
+		if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
+		{
+#ifdef _DEBUG
+			__debugbreak();
+#endif
+			return false;
+		}
 		scratches.push_back(pScratchResource); // extend up to execute
 
 		// Bottom Level Acceleration Structure desc
@@ -782,12 +1081,30 @@ bool Renderer::BuildAccelerationStructures()
 	ID3D12Resource* pScratchResource = nullptr;
 
 	D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-	AllocateUAVBuffer(m_pDevice, topLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
-	AllocateUAVBuffer(m_pDevice, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_pTopLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure");
+	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource"))
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
+	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)&m_pTopLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure"))
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
 
 	// Top Level Acceleration Structure desc
 	ID3D12Resource* pInstanceDescs = nullptr;
-	AllocateUploadBuffer(m_pDevice, instanceDescriptors.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(), &pInstanceDescs, L"InstanceDescs");
+	if (!AllocateUploadBuffer(instanceDescriptors.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(), &pInstanceDescs, L"InstanceDescs"))
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+		return false;
+	}
 
 	topLevelBuildDesc.DestAccelerationStructureData = m_pTopLevelAccelerationStructure->GetGPUVirtualAddress();
 	topLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
@@ -802,13 +1119,31 @@ bool Renderer::BuildAccelerationStructures()
 	Fence();
 	WaitForGPU();
 
-
 	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
 	{
 		scratches[i]->Release();
 	}
 	pScratchResource->Release();
 	pInstanceDescs->Release();
+
+	return true;
+
+LB_FAILED:
+	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
+	{
+		if (scratches[i])
+		{
+			scratches[i]->Release();
+		}
+	}
+	if (pScratchResource)
+	{
+		pScratchResource->Release();
+	}
+	if (pInstanceDescs)
+	{
+		pInstanceDescs->Release();
+	}
 
 	return true;
 }
@@ -903,6 +1238,141 @@ bool Renderer::BuildShaderTables()
 	return true;
 }
 
+bool Renderer::AllocateUploadBuffer(void* pData, UINT64 dataSize, ID3D12Resource** ppOutResource, const WCHAR* pszResourceName)
+{
+	_ASSERT(m_pDevice);
+	_ASSERT(dataSize > 0);
+	_ASSERT(ppOutResource);
+
+	if (*ppOutResource)
+	{
+		return false;
+	}
+
+
+	HRESULT hr;
+
+	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
+	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(dataSize);
+	hr = m_pDevice->CreateCommittedResource(&uploadHeapProperties,
+											D3D12_HEAP_FLAG_NONE,
+											&bufferDesc,
+											D3D12_RESOURCE_STATE_GENERIC_READ,
+											nullptr,
+											IID_PPV_ARGS(ppOutResource));
+	if (FAILED(hr))
+	{
+		BREAK_IF_FAILED(hr);
+		return false;
+	}
+	if (pszResourceName)
+	{
+		(*ppOutResource)->SetName(pszResourceName);
+	}
+
+	if (pData)
+	{
+		void* pMappedData = nullptr;
+		hr = (*ppOutResource)->Map(0, nullptr, &pMappedData);
+		if (FAILED(hr))
+		{
+			BREAK_IF_FAILED(hr);
+			return false;
+		}
+		memcpy(pMappedData, pData, dataSize);
+		(*ppOutResource)->Unmap(0, nullptr);
+	}
+
+	return true;
+}
+
+bool Renderer::AllocateUAVBuffer(UINT64 bufferSize, ID3D12Resource** ppOutResource, D3D12_RESOURCE_STATES initialResourceState, const WCHAR* pszResourceName)
+{
+	_ASSERT(m_pDevice);
+	_ASSERT(bufferSize > 0);
+	_ASSERT(ppOutResource);
+
+	if (*ppOutResource)
+	{
+		return false;
+	}
+
+
+	HRESULT hr;
+
+	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
+	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	hr = m_pDevice->CreateCommittedResource(&uploadHeapProperties,
+											D3D12_HEAP_FLAG_NONE,
+											&bufferDesc,
+											initialResourceState,
+											nullptr,
+											IID_PPV_ARGS(ppOutResource));
+	if (FAILED(hr))
+	{
+		BREAK_IF_FAILED(hr);
+		return false;
+	}
+	if (pszResourceName)
+	{
+		(*ppOutResource)->SetName(pszResourceName);
+	}
+
+	return true;
+}
+
+UINT Renderer::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* pOutCPUDescriptor, UINT descriptorIndexToUse)
+{
+	_ASSERT(m_pCBVSRVUAVDescriptorHeap);
+	_ASSERT(m_pDevice);
+	_ASSERT(pOutCPUDescriptor);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptorHeapCPUBase = m_pCBVSRVUAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = m_pCBVSRVUAVDescriptorHeap->GetDesc();
+	if (m_NumCBVSRVUAVDescriptorAlloced == heapDesc.NumDescriptors || descriptorIndexToUse < m_NumCBVSRVUAVDescriptorAlloced)
+	{
+		return UINT_MAX;
+	}
+
+	descriptorIndexToUse = m_NumCBVSRVUAVDescriptorAlloced++;
+	*pOutCPUDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCPUBase, descriptorIndexToUse, m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
+	return descriptorIndexToUse;
+}
+
+UINT Renderer::CreateBufferSRV(D3DBuffer* pOutBuffer, UINT numElements, UINT elementSize)
+{
+	_ASSERT(m_pDevice);
+	_ASSERT(m_pCBVSRVUAVDescriptorHeap);
+	_ASSERT(pOutBuffer);
+	_ASSERT(numElements >= 1);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Buffer.NumElements = numElements;
+	if (elementSize == 0)
+	{
+		srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+		srvDesc.Buffer.StructureByteStride = 0;
+	}
+	else
+	{
+		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		srvDesc.Buffer.StructureByteStride = elementSize;
+	}
+
+	UINT descriptorIndex = AllocateDescriptor(&pOutBuffer->CPUDescriptorHandle);
+	m_pDevice->CreateShaderResourceView(pOutBuffer->pResource, &srvDesc, pOutBuffer->CPUDescriptorHandle);
+	pOutBuffer->GPUDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_pCBVSRVUAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+																	descriptorIndex,
+																	m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+
+	return descriptorIndex;
+}
+
 void Renderer::UpdateCameraMatrices()
 {
 	m_FrameCB[m_FrameIndex].CameraPosition = m_Eye;
@@ -913,6 +1383,34 @@ void Renderer::UpdateCameraMatrices()
 
 	m_FrameCB[m_FrameIndex].ProjectionToWorld = DirectX::XMMatrixInverse(nullptr, proj);
 	m_FrameCB[m_FrameIndex].ModelViewInverse = DirectX::XMMatrixInverse(nullptr, view);
+}
+
+void Renderer::Prepare(D3D12_RESOURCE_STATES beforeState)
+{
+	_ASSERT(m_ppCommandAllocators[m_FrameIndex]);
+	_ASSERT(m_ppCommandLists[m_FrameIndex]);
+
+	HRESULT hr;
+
+	hr = m_ppCommandAllocators[m_FrameIndex]->Reset();
+	if (FAILED(hr))
+	{
+		__debugbreak();
+		return;
+	}
+	hr = m_ppCommandLists[m_FrameIndex]->Reset(m_ppCommandAllocators[m_FrameIndex], nullptr);
+	if (FAILED(hr))
+	{
+		__debugbreak();
+		return;
+	}
+
+	if (beforeState != D3D12_RESOURCE_STATE_RENDER_TARGET)
+	{
+		// Transition the render target into the correct state to allow for drawing into it.
+		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_ppRenderTargets[m_FrameIndex], beforeState, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		m_ppCommandLists[m_FrameIndex]->ResourceBarrier(1, &barrier);
+	}
 }
 
 void Renderer::DoRaytracing()
@@ -935,7 +1433,7 @@ void Renderer::DoRaytracing()
 	// Copy the updated scene constant buffer to GPU.
 	memcpy(&m_pMappedConstantData[m_FrameIndex].Constants, &m_FrameCB[m_FrameIndex], sizeof(FrameBuffer));
 	ULONGLONG cbGpuAddress = m_pFrameConstants->GetGPUVirtualAddress() + m_FrameIndex * sizeof(AlignedSceneConstantBuffer);
-	pCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+	pCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams_SceneConstantSlot, cbGpuAddress);
 
 	// Bind the heaps, acceleration structure and dispatch rays.
 	pCommandList->SetDescriptorHeaps(1, &m_pCBVSRVUAVDescriptorHeap);
@@ -943,9 +1441,9 @@ void Renderer::DoRaytracing()
 	CD3DX12_GPU_DESCRIPTOR_HANDLE raytracingOutputGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_pCBVSRVUAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
 																								m_RaytracingOutputResourceUAVDescriptorHeapIndex,
 																								m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
-	pCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_IndexBuffer.GPUDescriptorHandle);
-	pCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, raytracingOutputGPUDescriptor);
-	pCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_pTopLevelAccelerationStructure->GetGPUVirtualAddress());
+	pCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams_VertexBufferSlot, m_IndexBuffer.GPUDescriptorHandle);
+	pCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams_OutputViewSlot, raytracingOutputGPUDescriptor);
+	pCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams_AccelerationStructureSlot, m_pTopLevelAccelerationStructure->GetGPUVirtualAddress());
 
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	// Since each shader table has only one shader record, the stride is same as the size.
@@ -963,6 +1461,28 @@ void Renderer::DoRaytracing()
 
 	pCommandList->SetPipelineState1(m_pStateObject);
 	pCommandList->DispatchRays(&dispatchDesc);
+}
+
+void Renderer::CopyRaytracingOutputToBackbuffer()
+{
+	_ASSERT(m_ppCommandLists[m_FrameIndex]);
+	_ASSERT(m_ppRenderTargets[m_FrameIndex]);
+	_ASSERT(m_pRaytracingOutput);
+
+	ID3D12GraphicsCommandList* pCommandList = m_ppCommandLists[m_FrameIndex];
+	ID3D12Resource* pRenderTarget = m_ppRenderTargets[m_FrameIndex];
+
+	D3D12_RESOURCE_BARRIER preCopyBarriers[2] = {};
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	pCommandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+	pCommandList->CopyResource(pRenderTarget, m_pRaytracingOutput);
+
+	D3D12_RESOURCE_BARRIER postCopyBarriers[2] = {};
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pRenderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_pRaytracingOutput, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	pCommandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
 }
 
 void Renderer::ExecuteCommandList()
@@ -983,6 +1503,43 @@ void Renderer::ExecuteCommandList()
 	m_pCommandQueue->ExecuteCommandLists(ARRAYSIZE(ppCommandLists), ppCommandLists);
 }
 
+void Renderer::Present(D3D12_RESOURCE_STATES beforeState)
+{
+	_ASSERT(m_ppCommandLists[m_FrameIndex]);
+	_ASSERT(m_pSwapChain);
+
+	if (beforeState != D3D12_RESOURCE_STATE_PRESENT)
+	{
+		// Transition the render target to the state that allows it to be presented to the display.
+		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_ppRenderTargets[m_BackBufferIndex], beforeState, D3D12_RESOURCE_STATE_PRESENT);
+		m_ppCommandLists[m_FrameIndex]->ResourceBarrier(1, &barrier);
+	}
+
+	ExecuteCommandList();
+
+	HRESULT hr;
+	if (m_Option & DeviceOption_AllowTearing)
+	{
+		hr = m_pSwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+	}
+	else
+	{
+		hr = m_pSwapChain->Present(1, 0);
+	}
+
+	if (FAILED(hr))
+	{
+		__debugbreak();
+		return;
+	}
+
+	Fence();
+	WaitForGPU();
+
+	// next frame index.
+	m_FrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
+}
+
 void Renderer::SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC* pDesc, ID3D12RootSignature** ppRootSig)
 {
 	_ASSERT(m_pDevice);
@@ -999,7 +1556,7 @@ void Renderer::SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DE
 			OutputDebugStringA((const char*)pError->GetBufferPointer());
 			pError->Release();
 		}
-		
+
 		__debugbreak();
 		return;
 	}

@@ -3,6 +3,20 @@
 #include "RaytracingHLSLCompat.h"
 #include "framework.h"
 
+enum GlobalRootSignatureParams
+{
+	GlobalRootSignatureParams_OutputViewSlot = 0,
+	GlobalRootSignatureParams_AccelerationStructureSlot,
+	GlobalRootSignatureParams_SceneConstantSlot,
+	GlobalRootSignatureParams_VertexBufferSlot,
+	GlobalRootSignatureParams_Count
+};
+enum LocalRootSignatureParams
+{
+	LocalRootSignatureParams_MeshBufferSlot = 0,
+	LocalRootSignatureParams_Count
+};
+
 union AlignedSceneConstantBuffer
 {
 	FrameBuffer Constants;

@@ -9,7 +9,7 @@ enum D3DDeviceOption
 	DeviceOption_RequireTearingSupport = 0x2
 };
 
-class Renderer
+class Renderer final
 {
 private:
 	static const SIZE_T MAX_BACK_BUFFER_COUNT = 2;
@@ -18,19 +18,22 @@ public:
 	Renderer() = default;
 	~Renderer() { Cleanup(); }
 
-	bool Initialize(UINT width, UINT height);
+	bool Initialize(HINSTANCE hInstance, WNDPROC pfnWndProc, UINT width, UINT height);
 	bool Cleanup();
+
+	void Run();
 
 	void Update();
 	void Render();
 
-	void ChangeSize();
+	void ChangeSize(UINT width, UINT height);
 
 private:
 	bool InitializeDXGIAdapter();
 	bool InitializeD3DDeviceResources();
 
 	bool CreateWindowDependentedResources();
+	void ReleaseWindowDependentedResources();
 	bool CreateDeviceDependentResources();
 	bool CreateConstantBuffers();
 
@@ -42,10 +45,19 @@ private:
 	bool BuildAccelerationStructures();
 	bool BuildShaderTables();
 
+	bool AllocateUploadBuffer(void* pData, UINT64 dataSize, ID3D12Resource** ppOutResource, const WCHAR* pszResourceName);
+	bool AllocateUAVBuffer(UINT64 bufferSize, ID3D12Resource** ppOutResource, D3D12_RESOURCE_STATES initialResourceState, const WCHAR* pszResourceName);
+	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* pOutCPUDescriptor, UINT descriptorIndexToUse = UINT_MAX);
+
+	UINT CreateBufferSRV(D3DBuffer* pOutBuffer, UINT numElements, UINT elementSize);
+
 	void UpdateCameraMatrices();
 
+	void Prepare(D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_PRESENT);
 	void DoRaytracing();
+	void CopyRaytracingOutputToBackbuffer();
 	void ExecuteCommandList();
+	void Present(D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC* pDesc, ID3D12RootSignature** ppRootSig);
 
@@ -86,9 +98,9 @@ private:
 	ID3D12DescriptorHeap* m_pRTVDescriptorHeap = nullptr;
 	ID3D12DescriptorHeap* m_pDSVDescriptorHeap = nullptr;
 	ID3D12DescriptorHeap* m_pCBVSRVUAVDescriptorHeap = nullptr;
-	UINT m_RTVDescriptorSize = 0;
-	UINT m_DSVDescriptorSize = 0;
-	UINT m_CBVSRVUAVDescriptorSize = 0;
+	UINT m_NumRTVDescriptorAlloced = 0;
+	UINT m_NumDSVDescriptorAlloced = 0;
+	UINT m_NumCBVSRVUAVDescriptorAlloced = 0;
 	
 	UINT m_RaytracingOutputResourceUAVDescriptorHeapIndex = 0xFFFFFFFF;
 	ID3D12Resource2* m_pRaytracingOutput = nullptr;
