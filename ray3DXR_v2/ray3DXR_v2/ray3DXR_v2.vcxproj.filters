@@ -57,9 +57,6 @@
     <ClInclude Include="GPUResources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="D3DUtil.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ray3DXR_v2.cpp">
@@ -80,9 +77,6 @@
     <ClCompile Include="GPUResources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D3DUtil.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ray3DXR_v2.rc">
@@ -96,5 +90,15 @@
     <Image Include="ray3DXR_v2.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Raytracing.hlsl">
+      <Filter>Shader Files</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Random.hlsl">
+      <Filter>Shader Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

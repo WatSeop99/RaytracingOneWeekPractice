@@ -75,6 +75,8 @@ private:
 	IDXGIFactory7* m_pDXGIFactory = nullptr;
 	IDXGIAdapter4* m_pDXGIAdapter = nullptr;
 	IDXGISwapChain4* m_pSwapChain = nullptr;
+	UINT m_AdapterID = UINT_MAX;
+	WCHAR m_szAdapterDescription[512] = { 0, };
 
 	DXGI_FORMAT m_BackBufferFormat = DXGI_FORMAT_UNKNOWN;
 	DXGI_FORMAT m_DepthBufferFormat = DXGI_FORMAT_UNKNOWN;

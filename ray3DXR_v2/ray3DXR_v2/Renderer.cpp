@@ -1,8 +1,8 @@
 #include "framework.h"
-#include "D3DUtil.h"
 #include "GeometryUtil.h"
 #include "GPUResources.h"
 #include "MathUtil.h"
+#include "CompiledShaders/Raytracing.hlsl.h"
 #include "Renderer.h"
 
 const WCHAR* szHIT_GROUP_NAME = L"MyHitGroup";
@@ -211,7 +211,7 @@ void Renderer::Update()
 			float MRaysPerSecond = (m_Width * m_Height * fps) / (float)1e6;
 
 			WCHAR szWindowText[512];
-			swprintf_s(szWindowText, 512, L"    fps: %d     ~Million Primary Rays/s: %f    GPU[%d]: %s", fps, MRaysPerSecond, m_AdapterID, m_AdapterDescription);
+			swprintf_s(szWindowText, 512, L"    fps: %d     ~Million Primary Rays/s: %f    GPU[%d]: %s", fps, MRaysPerSecond, m_AdapterID, m_szAdapterDescription);
 			SetWindowText(m_hMainWindow, szWindowText);
 		}
 	}
@@ -221,7 +221,7 @@ void Renderer::Update()
 	// Rotate the camera around Y axis.
 	float secondsToRotateAround = 60.0f;
 	float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-	XMMATRIX rotate = DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(angleToRotateBy));
+	DirectX::XMMATRIX rotate = DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(angleToRotateBy));
 	m_Eye = DirectX::XMVector3Transform(m_Eye, rotate);
 	m_Up = DirectX::XMVector3Transform(m_Up, rotate);
 	m_At = DirectX::XMVector3Transform(m_At, rotate);
@@ -358,6 +358,9 @@ bool Renderer::InitializeD3DDeviceResources()
 			{
 				pAdapter->QueryInterface(IID_PPV_ARGS(&m_pDXGIAdapter));
 				SAFE_COM_RELEASE(pAdapter);
+
+				m_AdapterID = adapterIndex;
+				swprintf_s(m_szAdapterDescription, 512, desc.Description, wcslen(desc.Description));
 
 				goto LB_EXIT_LOOP;
 			}
@@ -502,7 +505,7 @@ bool Renderer::CreateWindowDependentedResources()
 	swapChainDesc.Width = m_Width;
 	swapChainDesc.Height = m_Height;
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.BufferCount = MAX_BACK_BUFFER_COUNT;
 	swapChainDesc.SampleDesc.Count = 1;
 	swapChainDesc.SampleDesc.Quality = 0;
@@ -546,8 +549,8 @@ bool Renderer::CreateWindowDependentedResources()
 		m_pDevice->CreateRenderTargetView(m_ppRenderTargets[i], &rtvDesc, rtvDescriptor);
 		++m_NumRTVDescriptorAlloced;
 
-		WCHAR szDebugName[256];
-		swprintf_s(szDebugName, 256, L"RenderTaget[%d]", i);
+		WCHAR szDebugName[64];
+		swprintf_s(szDebugName, 64, L"RenderTaget[%d]", i);
 		m_ppRenderTargets[i]->SetName(szDebugName);
 	}
 
@@ -744,8 +747,8 @@ bool Renderer::CreateRaytracingPipelineStateObject()
 	pHitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
 
 	CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT* pShaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	UINT payloadSize = sizeof(XMFLOAT4) + sizeof(UINT) + sizeof(XMFLOAT4);// float4 pixelColor
-	UINT attributeSize = sizeof(XMFLOAT2);  // float2 barycentrics
+	UINT payloadSize = sizeof(DirectX::XMFLOAT4) + sizeof(UINT) + sizeof(DirectX::XMFLOAT4);// float4 pixelColor
+	UINT attributeSize = sizeof(DirectX::XMFLOAT2);  // float2 barycentrics
 	pShaderConfig->Config(payloadSize, attributeSize);
 
 	CreateLocalRootSignatureSubobjects(&raytracingPipeline);
