@@ -46,5 +46,5 @@ struct Geometry
 };
 
 #define INIT_BUFFER { nullptr, { 0xFFFFFFFFFFFFFFFF, }, { 0xFFFFFFFFFFFFFFFF, } }
-#define INIT_GEOMETRY { {}, {}, { 0.0f, 0.0f, 0.0f, 1.0f }, 0, XMMatrixIdentity(), 0, 0, nullptr }
+#define INIT_GEOMETRY { {}, {}, { 0.0f, 0.0f, 0.0f, 1.0f }, 0, DirectX::XMMatrixIdentity(), 0, 0, nullptr }
 

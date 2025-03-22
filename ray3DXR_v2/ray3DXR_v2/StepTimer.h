@@ -8,8 +8,8 @@ public:
     static const UINT64 TICKS_PER_SECOND = 10000000;
 
 public:
-    static double TicksToSeconds(UINT64 ticks) { return (double)ticks / TICKS_PER_SECOND; }
-    static UINT64 SecondsToTicks(double seconds) { return (UINT64)(seconds * TICKS_PER_SECOND); }
+    static inline double TicksToSeconds(UINT64 ticks) { return (double)ticks / TICKS_PER_SECOND; }
+    static inline UINT64 SecondsToTicks(double seconds) { return (UINT64)(seconds * TICKS_PER_SECOND); }
 
 public:
     StepTimer();

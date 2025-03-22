@@ -156,10 +156,11 @@ void D3D12RaytracingInOneWeekend::UpdateCameraMatrices()
 	UINT frameIndex = m_pDeviceResources->GetCurrentFrameIndex();
 
 	m_FrameCB[frameIndex].CameraPosition = m_Eye;
-	float fovAngleY = 20.0f;
-	XMMATRIX view = XMMatrixLookAtRH(m_Eye, m_At, m_Up);
-	XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
-	XMMATRIX viewProj = view * proj;
+	//float fovAngleY = 20.0f;
+	float fovAngleY = 45.0f;
+	XMMATRIX view = XMMatrixLookAtLH(m_Eye, m_At, m_Up);
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
+	//XMMATRIX viewProj = view * proj;
 
 	m_FrameCB[frameIndex].ProjectionToWorld = XMMatrixInverse(nullptr, proj);
 	m_FrameCB[frameIndex].ModelViewInverse = XMMatrixInverse(nullptr, view);
@@ -171,14 +172,12 @@ void D3D12RaytracingInOneWeekend::InitializeScene()
 	UINT frameIndex = m_pDeviceResources->GetCurrentFrameIndex();
 
 	// Setup camera.
-	{
-		// Initialize the view and projection inverse matrices.
-		m_Eye = { 13.0f, 2.0f, 3.0f, 1.0f };
-		m_At = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_Up = { 0.0f, 1.0f, 0.0f, 1.0f };
+	// Initialize the view and projection inverse matrices.
+	m_Eye = { 13.0f, 2.0f, 3.0f, 1.0f };
+	m_At = { 0.0f, 0.0f, 0.0f, 1.0f };
+	m_Up = { 0.0f, 1.0f, 0.0f, 1.0f };
 
-		UpdateCameraMatrices();
-	}
+	UpdateCameraMatrices();
 
 	// Apply the initial values to all frames' buffer instances.
 	for (FrameBuffer& sceneCB : m_FrameCB)
@@ -235,7 +234,6 @@ void D3D12RaytracingInOneWeekend::CreateDeviceDependentResources()
 
 	// Build raytracing acceleration structures from the generated geometry.
 	BuildAccelerationStructures();
-
 
 	// Create constant buffers for the geometry and the scene.
 	CreateConstantBuffers();

@@ -2,7 +2,7 @@
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
 #ifdef _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -49,13 +49,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
 		if (pRenderer)
 		{
-			UINT width = (UINT)HIWORD(lParam);
-			UINT height = (UINT)LOWORD(lParam);
+			UINT width = (UINT)LOWORD(lParam);
+			UINT height = (UINT)HIWORD(lParam);
 			pRenderer->ChangeSize(width, height);
 		}
+
 		break;
 	}
 
+	case WM_PAINT:
+	{
+		if (pRenderer)
+		{
+			pRenderer->Update();
+			pRenderer->Render();
+		}
+
+		break;
+	}
+
+	case WM_QUIT:
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;

@@ -74,16 +74,21 @@ bool Renderer::Initialize(HINSTANCE hInstance, WNDPROC pfnWndProc, UINT width, U
 		return false;
 	}
 
+	if (!InitScene())
+	{
+		return false;
+	}
+
 	return true;
 }
 
 bool Renderer::Cleanup()
 {
-	// wait for gpu.
-	WaitForGPU();
-
 	if (m_hFenceEvent)
 	{
+		// wait for gpu.
+		WaitForGPU();
+
 		CloseHandle(m_hFenceEvent);
 		m_hFenceEvent = nullptr;
 	}
@@ -102,7 +107,6 @@ bool Renderer::Cleanup()
 	SAFE_COM_RELEASE(m_pFrameConstants);
 	if (m_pMappedConstantData)
 	{
-		delete m_pMappedConstantData;
 		m_pMappedConstantData = nullptr;
 	}
 
@@ -169,19 +173,14 @@ void Renderer::Run()
 	MSG msg = {};
 	while (TRUE)
 	{
-		if (PeekMessage(&msg, m_hMainWindow, 0, 0, PM_REMOVE))
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
-			if (msg.message == WM_QUIT)
+			if (msg.message == WM_QUIT || msg.message == WM_DESTROY)
 			{
 				break;
 			}
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-		}
-		else
-		{
-			Update();
-			Render();
 		}
 	}
 }
@@ -192,28 +191,26 @@ void Renderer::Update()
 
 	m_Timer.Tick();
 	//CalculateFrameStats();
+	static int s_FrameCnt = 0;
+	static double s_ElapsedTime = 0.0f;
+
+	double totalTime = m_Timer.GetTotalSeconds();
+	++s_FrameCnt;
+
+	// Compute averages over one second period.
+	if ((totalTime - s_ElapsedTime) >= 1.0f)
 	{
-		static int s_FrameCnt = 0;
-		static double s_ElapsedTime = 0.0f;
+		float diff = (float)(totalTime - s_ElapsedTime);
+		float fps = (float)s_FrameCnt / diff; // Normalize to an exact second.
 
-		double totalTime = m_Timer.GetTotalSeconds();
-		++s_FrameCnt;
+		s_FrameCnt = 0;
+		s_ElapsedTime = totalTime;
 
-		// Compute averages over one second period.
-		if ((totalTime - s_ElapsedTime) >= 1.0f)
-		{
-			float diff = (float)(totalTime - s_ElapsedTime);
-			float fps = (float)s_FrameCnt / diff; // Normalize to an exact second.
+		float MRaysPerSecond = (m_Width * m_Height * fps) / (float)1e6;
 
-			s_FrameCnt = 0;
-			s_ElapsedTime = totalTime;
-
-			float MRaysPerSecond = (m_Width * m_Height * fps) / (float)1e6;
-
-			WCHAR szWindowText[512];
-			swprintf_s(szWindowText, 512, L"    fps: %d     ~Million Primary Rays/s: %f    GPU[%d]: %s", fps, MRaysPerSecond, m_AdapterID, m_szAdapterDescription);
-			SetWindowText(m_hMainWindow, szWindowText);
-		}
+		WCHAR szWindowText[512];
+		swprintf_s(szWindowText, 512, L"    fps: %f     ~Million Primary Rays/s: %f    GPU[%d]: %s", fps, MRaysPerSecond, m_AdapterID, m_szAdapterDescription);
+		SetWindowText(m_hMainWindow, szWindowText);
 	}
 
 	float elapsedTime = (float)m_Timer.GetElapsedSeconds();
@@ -233,7 +230,7 @@ void Renderer::Render()
 	_ASSERT(m_hMainWindow);
 
 	// If window is invisible, just return functions.
-	long hwndStyle = GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
+	long hwndStyle = (long)GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
 	if (!(hwndStyle & WS_VISIBLE) || (hwndStyle & WS_MINIMIZE))
 	{
 		return;
@@ -249,8 +246,13 @@ void Renderer::Render()
 void Renderer::ChangeSize(UINT width, UINT height)
 {
 	_ASSERT(m_hMainWindow);
+	if (width == 0 || height == 0)
+	{
+		OutputDebugString(L"width or height is 0.\n");
+		return;
+	}
 
-	long hwndStyle = GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
+	long hwndStyle = (long)GetWindowLongPtr(m_hMainWindow, GWL_STYLE);
 	if (hwndStyle & WS_MINIMIZE)
 	{
 		return;
@@ -258,9 +260,17 @@ void Renderer::ChangeSize(UINT width, UINT height)
 
 	m_Width = width;
 	m_Height = height;
+	m_AspectRatio = (float)width / (float)height;
 
 	ReleaseWindowDependentedResources();
 	if (!CreateWindowDependentedResources())
+	{
+#ifdef _DEBUG
+		__debugbreak();
+#endif
+	}
+
+	if (!CreateRaytracingOutput())
 	{
 #ifdef _DEBUG
 		__debugbreak();
@@ -324,7 +334,7 @@ bool Renderer::InitializeDXGIAdapter()
 
 bool Renderer::InitializeD3DDeviceResources()
 {
-	if (!m_pDXGIFactory || !m_pDXGIAdapter)
+	if (!m_pDXGIFactory)
 	{
 #ifdef _DEBUG
 		__debugbreak();
@@ -395,7 +405,6 @@ LB_EXIT_LOOP:
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	descriptorHeapDesc.NumDescriptors = MAX_BACK_BUFFER_COUNT;
-
 	hr = m_pDevice->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&m_pRTVDescriptorHeap));
 	if (FAILED(hr))
 	{
@@ -406,7 +415,6 @@ LB_EXIT_LOOP:
 
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	descriptorHeapDesc.NumDescriptors = 1;
-
 	hr = m_pDevice->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&m_pDSVDescriptorHeap));
 	if (FAILED(hr))
 	{
@@ -417,7 +425,7 @@ LB_EXIT_LOOP:
 
 	descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	descriptorHeapDesc.NumDescriptors = 512;
-
+	descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	hr = m_pDevice->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&m_pCBVSRVUAVDescriptorHeap));
 	if (FAILED(hr))
 	{
@@ -484,12 +492,25 @@ LB_EXIT_LOOP:
 		return false;
 	}
 
-	if (!CreateConstantBuffers())
+	return true;
+}
+
+bool Renderer::InitScene()
+{
+	// Setup camera.
 	{
-#ifdef _DEBUG
-		__debugbreak();
-#endif
-		return false;
+		// Initialize the view and projection inverse matrices.
+		m_Eye = { 13.0f, 2.0f, 3.0f, 1.0f };
+		m_At = { 0.0f, 0.0f, 0.0f, 1.0f };
+		m_Up = { 0.0f, 1.0f, 0.0f, 1.0f };
+
+		UpdateCameraMatrices();
+	}
+
+	// Apply the initial values to all frames' buffer instances.
+	for (UINT i = 0; i < MAX_BACK_BUFFER_COUNT; ++i)
+	{
+		m_FrameCB[i] = m_FrameCB[m_FrameIndex];
 	}
 
 	return true;
@@ -513,6 +534,10 @@ bool Renderer::CreateWindowDependentedResources()
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 	swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+	if (m_Option & DeviceOption_AllowTearing)
+	{
+		swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+	}
 
 	DXGI_SWAP_CHAIN_FULLSCREEN_DESC fsSwapChainDesc = {};
 	fsSwapChainDesc.Windowed = TRUE;
@@ -541,6 +566,8 @@ bool Renderer::CreateWindowDependentedResources()
 			return false;
 		}
 
+		D3D12_RESOURCE_DESC desc = m_ppRenderTargets[i]->GetDesc();
+
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 		rtvDesc.Format = m_BackBufferFormat;
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -562,21 +589,16 @@ bool Renderer::CreateWindowDependentedResources()
 
 void Renderer::ReleaseWindowDependentedResources()
 {
+	SAFE_COM_RELEASE(m_pRaytracingOutput);
+	m_RaytracingOutputResourceUAVDescriptorHeapIndex = 0xFFFFFFFF;
+
 	for (UINT i = 0; i < MAX_BACK_BUFFER_COUNT; ++i)
 	{
-		if (m_ppRenderTargets[i])
-		{
-			m_ppRenderTargets[i]->Release();
-			m_ppRenderTargets[i] = nullptr;
-		}
+		SAFE_COM_RELEASE(m_ppRenderTargets[i]);
 	}
 	m_NumRTVDescriptorAlloced = 0;
 
-	if (m_pSwapChain)
-	{
-		m_pSwapChain->Release();
-		m_pSwapChain = nullptr;
-	}
+	SAFE_COM_RELEASE(m_pSwapChain);
 
 	m_BackBufferFormat = DXGI_FORMAT_UNKNOWN;
 	m_FrameIndex = 0;
@@ -616,36 +638,10 @@ bool Renderer::CreateDeviceDependentResources()
 		return false;
 	}
 
-	// Create raytracing output reosurce.
-	if (m_pRaytracingOutput)
+	if (!CreateRaytracingOutput())
 	{
 		return false;
 	}
-	{
-		// Create the output resource.The dimensions and format should match the swap - chain.
-		CD3DX12_RESOURCE_DESC uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_BackBufferFormat, m_Width, m_Height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
-		HRESULT hr = m_pDevice->CreateCommittedResource(&defaultHeapProperties,
-														D3D12_HEAP_FLAG_NONE,
-														&uavDesc,
-														D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-														nullptr,
-														IID_PPV_ARGS(&m_pRaytracingOutput));
-		if (FAILED(hr))
-		{
-			BREAK_IF_FAILED(hr);
-			return false;
-		}
-		m_pRaytracingOutput->SetName(L"m_pRaytracingOutput");
-
-		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = {};
-		m_RaytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_RaytracingOutputResourceUAVDescriptorHeapIndex);
-
-		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
-		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		m_pDevice->CreateUnorderedAccessView(m_pRaytracingOutput, nullptr, &UAVDesc, uavDescriptorHandle);
-	}
-
 
 	return true;
 }
@@ -688,6 +684,40 @@ bool Renderer::CreateConstantBuffers()
 	return true;
 }
 
+bool Renderer::CreateRaytracingOutput()
+{
+	if (m_pRaytracingOutput)
+	{
+		return false;
+	}
+	
+	// Create the output resource.The dimensions and format should match the swap - chain.
+	CD3DX12_RESOURCE_DESC uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_BackBufferFormat, m_Width, m_Height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
+	HRESULT hr = m_pDevice->CreateCommittedResource(&defaultHeapProperties,
+													D3D12_HEAP_FLAG_NONE,
+													&uavDesc,
+													D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+													nullptr,
+													IID_PPV_ARGS(&m_pRaytracingOutput));
+	if (FAILED(hr))
+	{
+		BREAK_IF_FAILED(hr);
+		return false;
+	}
+	m_pRaytracingOutput->SetName(L"m_pRaytracingOutput");
+
+
+	D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = {};
+	m_RaytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_RaytracingOutputResourceUAVDescriptorHeapIndex);
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	m_pDevice->CreateUnorderedAccessView(m_pRaytracingOutput, nullptr, &UAVDesc, uavDescriptorHandle);
+
+	return true;
+}
+
 bool Renderer::CreateRootSignature()
 {
 	// Global Root Signature
@@ -696,19 +726,21 @@ bool Renderer::CreateRootSignature()
 	{
 		return false;
 	}
+	{
+		CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
-	CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
-	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
-	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
+		CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams_Count];
+		rootParameters[GlobalRootSignatureParams_OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+		rootParameters[GlobalRootSignatureParams_AccelerationStructureSlot].InitAsShaderResourceView(0);
+		rootParameters[GlobalRootSignatureParams_SceneConstantSlot].InitAsConstantBufferView(0);
+		rootParameters[GlobalRootSignatureParams_VertexBufferSlot].InitAsDescriptorTable(1, &ranges[1]);
 
-	CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams_Count];
-	rootParameters[GlobalRootSignatureParams_OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
-	rootParameters[GlobalRootSignatureParams_AccelerationStructureSlot].InitAsShaderResourceView(0);
-	rootParameters[GlobalRootSignatureParams_SceneConstantSlot].InitAsConstantBufferView(0);
-	rootParameters[GlobalRootSignatureParams_VertexBufferSlot].InitAsDescriptorTable(1, &ranges[1]);
+		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+		SerializeAndCreateRaytracingRootSignature(&globalRootSignatureDesc, &m_pRaytracingGlobalRootSignature);
+	}
 
-	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
-	SerializeAndCreateRaytracingRootSignature(&globalRootSignatureDesc, &m_pRaytracingGlobalRootSignature);
 
 	// Local Root Signature
 
@@ -716,13 +748,14 @@ bool Renderer::CreateRootSignature()
 	{
 		return false;
 	}
+	{
+		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams_Count];
+		rootParameters[LocalRootSignatureParams_MeshBufferSlot].InitAsConstants(sizeof(MeshBuffer), 1);
 
-	CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams_Count];
-	rootParameters[LocalRootSignatureParams_MeshBufferSlot].InitAsConstants(sizeof(MeshBuffer), 1);
-
-	CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
-	localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-	SerializeAndCreateRaytracingRootSignature(&localRootSignatureDesc, &m_pRaytracingLocalRootSignature);
+		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+		SerializeAndCreateRaytracingRootSignature(&localRootSignatureDesc, &m_pRaytracingLocalRootSignature);
+	}
 
 	return true;
 }
@@ -819,8 +852,8 @@ bool Renderer::BuildGeometry()
 			{
 				double chooseMat = RandomDouble();
 				DirectX::XMVECTOR center = { (float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat() };
-				DirectX::XMVECTOR length = XMVector3Length(XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
-				if (XMVectorGetX(length) > 0.9f)
+				DirectX::XMVECTOR length = DirectX::XMVector3Length(DirectX::XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
+				if (DirectX::XMVectorGetX(length) > 0.9f)
 				{
 					DirectX::XMVECTOR materialParameter;
 					int materialType = 0;
@@ -836,14 +869,14 @@ bool Renderer::BuildGeometry()
 					{
 						// metal
 						materialType = METALLIC;
-						float fuzz = RandomFloat(0, 0.5);
+						float fuzz = RandomFloat(0.0f, 0.5f);
 						materialParameter = { RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), fuzz };
 					}
 					else
 					{
 						// glass
 						materialType = DIELECTRIC;
-						materialParameter = { 1.5, 1.5, 1.5, 1.5 };
+						materialParameter = { 1.5f, 1.5f, 1.5f, 1.5f };
 					}
 
 					Geometry geom = {};
@@ -1379,10 +1412,10 @@ UINT Renderer::CreateBufferSRV(D3DBuffer* pOutBuffer, UINT numElements, UINT ele
 void Renderer::UpdateCameraMatrices()
 {
 	m_FrameCB[m_FrameIndex].CameraPosition = m_Eye;
-	float fovAngleY = 20.0f;
-	XMMATRIX view = DirectX::XMMatrixLookAtRH(m_Eye, m_At, m_Up);
-	XMMATRIX proj = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
-	XMMATRIX viewProj = view * proj;
+	float fovAngleY = 45.0f;
+	XMMATRIX view = DirectX::XMMatrixLookAtLH(m_Eye, m_At, m_Up);
+	XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
+	//XMMATRIX viewProj = view * proj;
 
 	m_FrameCB[m_FrameIndex].ProjectionToWorld = DirectX::XMMatrixInverse(nullptr, proj);
 	m_FrameCB[m_FrameIndex].ModelViewInverse = DirectX::XMMatrixInverse(nullptr, view);

@@ -12,7 +12,7 @@ enum D3DDeviceOption
 class Renderer final
 {
 private:
-	static const SIZE_T MAX_BACK_BUFFER_COUNT = 2;
+	static const UINT MAX_BACK_BUFFER_COUNT = 2;
 
 public:
 	Renderer() = default;
@@ -31,11 +31,13 @@ public:
 private:
 	bool InitializeDXGIAdapter();
 	bool InitializeD3DDeviceResources();
+	bool InitScene();
 
 	bool CreateWindowDependentedResources();
 	void ReleaseWindowDependentedResources();
 	bool CreateDeviceDependentResources();
 	bool CreateConstantBuffers();
+	bool CreateRaytracingOutput();
 
 	bool CreateRootSignature();
 	bool CreateRaytracingPipelineStateObject();

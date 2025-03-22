@@ -37,4 +37,6 @@
 #ifdef _DEBUG
 #define BREAK_IF_FAILED(hr) if (FAILED(hr)) __debugbreak()
 //#define new DEBUG_NEW
+#else
+#define BREAK_IF_FAILED(hr) 
 #endif
