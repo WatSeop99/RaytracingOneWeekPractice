@@ -42,7 +42,7 @@ float3 HitWorldPosition()
 }
 
 // Retrieve attribute at a hit position interpolated from vertex attributes using the hit's barycentrics.
-float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
+float3 HitAttribute(in float3 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
 {
     return vertexAttribute[0] +
         attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
@@ -101,7 +101,7 @@ RayPayload ScatterDielectric(in float4 albedo, in float3 worldRayDirection, in f
 [shader("raygeneration")]
 void MyRaygenShader()
 {
-    uint TotalNumberOfSamples = 4; // TODO: should be in camera
+    uint TotalNumberOfSamples = 5; // TODO: should be in camera
     uint randomSeed = InitRandomSeed(InitRandomSeed(DispatchRaysIndex().x, DispatchRaysIndex().y), TotalNumberOfSamples);
     uint pixelRandomSeed = 1; // TODO: pass with raypayload
     // Generate a ray for a camera pixel corresponding to an index from the dispatched 2D grid.
@@ -111,7 +111,7 @@ void MyRaygenShader()
     float3 color = float3(0.0f, 0.0f, 0.0f);
     uint3 rayIndex = DispatchRaysIndex();
     
-    for (int sample = 0; sample < TotalNumberOfSamples; sample++)
+    for (int sample = 0; sample < TotalNumberOfSamples; ++sample)
     {
         float3 rayColor = float3(1.0f, 1.0f, 1.0f);
        

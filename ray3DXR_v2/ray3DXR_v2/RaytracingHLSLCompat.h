@@ -5,7 +5,7 @@
 #include "HLSLCompat.h"
 #else
 using namespace DirectX;
-typedef UINT16 Index;
+typedef UINT32 Index;
 #endif
 
 struct FrameBuffer

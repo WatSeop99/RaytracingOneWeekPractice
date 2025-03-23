@@ -33,7 +33,7 @@ struct D3DBuffer
 struct Geometry
 {
 	std::vector<Vertex> Vertices;
-	std::vector<UINT32> Indices;
+	std::vector<Index> Indices;
 	DirectX::XMFLOAT4 Albedo;
 	int MaterialID;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Camera.h"
 #include "CommonTypes.h"
 #include "StepTimer.h"
 
@@ -27,6 +28,14 @@ public:
 	void Render();
 
 	void ChangeSize(UINT width, UINT height);
+
+	// Mouse process.
+	void ProcessMosuseMove(int x, int y);
+	inline void SetMouseLButton(bool bSet) { m_Mouse.bMouseLeftButton = bSet; }
+	inline void SetMouseRButton(bool bSet) { m_Mouse.bMouseRightButton = bSet; }
+
+	// Keyboard process.
+	inline void SetKeyboardKey(WPARAM wParam, bool bSet) { m_Keyboard.bPressed[wParam] = bSet; }
 
 private:
 	bool InitializeDXGIAdapter();
@@ -130,5 +139,9 @@ private:
 	DirectX::XMVECTOR m_Eye;
 	DirectX::XMVECTOR m_At;
 	DirectX::XMVECTOR m_Up;
+
+	Camera m_Camera;
+	Keyboard m_Keyboard;
+	Mouse m_Mouse;
 };
 

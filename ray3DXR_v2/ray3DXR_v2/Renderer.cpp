@@ -183,6 +183,8 @@ void Renderer::Run()
 			DispatchMessage(&msg);
 		}
 	}
+
+	WaitForGPU();
 }
 
 void Renderer::Update()
@@ -190,7 +192,7 @@ void Renderer::Update()
 	_ASSERT(m_hMainWindow);
 
 	m_Timer.Tick();
-	//CalculateFrameStats();
+
 	static int s_FrameCnt = 0;
 	static double s_ElapsedTime = 0.0f;
 
@@ -214,14 +216,7 @@ void Renderer::Update()
 	}
 
 	float elapsedTime = (float)m_Timer.GetElapsedSeconds();
-
-	// Rotate the camera around Y axis.
-	float secondsToRotateAround = 60.0f;
-	float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-	DirectX::XMMATRIX rotate = DirectX::XMMatrixRotationY(DirectX::XMConvertToRadians(angleToRotateBy));
-	m_Eye = DirectX::XMVector3Transform(m_Eye, rotate);
-	m_Up = DirectX::XMVector3Transform(m_Up, rotate);
-	m_At = DirectX::XMVector3Transform(m_At, rotate);
+	m_Camera.UpdateKeyboard(elapsedTime, &m_Keyboard);
 	UpdateCameraMatrices();
 }
 
@@ -261,6 +256,7 @@ void Renderer::ChangeSize(UINT width, UINT height)
 	m_Width = width;
 	m_Height = height;
 	m_AspectRatio = (float)width / (float)height;
+	m_Camera.SetAspectRatio(m_AspectRatio);
 
 	ReleaseWindowDependentedResources();
 	if (!CreateWindowDependentedResources())
@@ -276,6 +272,25 @@ void Renderer::ChangeSize(UINT width, UINT height)
 		__debugbreak();
 #endif
 	}
+}
+
+void Renderer::ProcessMosuseMove(int x, int y)
+{
+	m_Mouse.MouseX = x;
+	m_Mouse.MouseY = y;
+
+	// 마우스 커서의 위치를 NDC로 변환.
+	// 마우스 커서는 좌측 상단 (0, 0), 우측 하단(width-1, height-1).
+	// NDC는 좌측 하단이 (-1, -1), 우측 상단(1, 1).
+	m_Mouse.MouseNDCX = (float)x * 2.0f / (float)m_Width - 1.0f;
+	m_Mouse.MouseNDCY = (float)(-y) * 2.0f / (float)m_Height + 1.0f;
+
+	// 커서가 화면 밖으로 나갔을 경우 범위 조절.
+	m_Mouse.MouseNDCX = Clamp(m_Mouse.MouseNDCX, -1.0f, 1.0f);
+	m_Mouse.MouseNDCY = Clamp(m_Mouse.MouseNDCY, -1.0f, 1.0f);
+
+	// 카메라 시점 회전.
+	m_Camera.UpdateMouse(m_Mouse.MouseNDCX, m_Mouse.MouseNDCY);
 }
 
 bool Renderer::InitializeDXGIAdapter()
@@ -500,9 +515,9 @@ bool Renderer::InitScene()
 	// Setup camera.
 	{
 		// Initialize the view and projection inverse matrices.
-		m_Eye = { 13.0f, 2.0f, 3.0f, 1.0f };
-		m_At = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m_Up = { 0.0f, 1.0f, 0.0f, 1.0f };
+		m_Camera.SetAspectRatio(m_AspectRatio);
+		m_Camera.SetEyePos(Vector3(13.0f, 2.0f, -10.0f));
+		m_Camera.SetViewDir(-m_Camera.GetEyePos());
 
 		UpdateCameraMatrices();
 	}
@@ -672,6 +687,7 @@ bool Renderer::CreateConstantBuffers()
 		BREAK_IF_FAILED(hr);
 		return false;
 	}
+	m_pFrameConstants->SetName(L"FrameConstants");
 
 	CD3DX12_RANGE readRange(0, 0);
 	hr = (m_pFrameConstants->Map(0, nullptr, (void**)&m_pMappedConstantData));
@@ -828,6 +844,10 @@ bool Renderer::BuildGeometry()
 
 	const int SLICE_COUNT = 16;
 	const int STACK_COUNT = 32;
+
+	SIZE_T totalNumIndices = 0;
+	SIZE_T totalNumVertices = 0;
+
 	{
 		Geometry geom = {};
 		if (!CreateSphere(1000.0f, SLICE_COUNT, 512, &geom.Vertices, &geom.Indices))
@@ -840,63 +860,69 @@ bool Renderer::BuildGeometry()
 
 		geom.Albedo = { 0.5f, 0.5f, 0.5f, 1.0f };
 		geom.MaterialID = LAMBERTIAN;
-		geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(0.0f, -1000.0f, 0.0f));
+
+		Vector3 pos(0.0f, -1000.0f, 0.0f);
+		Matrix transform = Matrix::CreateTranslation(pos);
+		geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 		m_Geometry.push_back(geom);
+		totalNumIndices += geom.Indices.size();
+		totalNumVertices += geom.Vertices.size();
 	}
 
+
+	for (int a = -11; a < 11; ++a)
 	{
-		for (int a = -11; a < 11; a++)
+		for (int b = -11; b < 11; ++b)
 		{
-			for (int b = -11; b < 11; b++)
+			Geometry geom = {};
+
+			double chooseMat = RandomDouble();
+			Vector3 center((float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat());
+			float length = (center - Vector3(4.0f, 0.2f, 0.0f)).Length();
+
+			if (length > 0.9f)
 			{
-				double chooseMat = RandomDouble();
-				DirectX::XMVECTOR center = { (float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat() };
-				DirectX::XMVECTOR length = DirectX::XMVector3Length(DirectX::XMVectorSubtract(center, { 4.0f, 0.2f, 0.0f }));
-				if (DirectX::XMVectorGetX(length) > 0.9f)
+				DirectX::XMVECTOR materialParameter;
+				int materialType = 0;
+
+				if (chooseMat < 0.8)
 				{
-					DirectX::XMVECTOR materialParameter;
-					int materialType = 0;
-
-					if (chooseMat < 0.8)
-					{
-						// diffuse
-						materialType = LAMBERTIAN;
-						DirectX::XMVECTOR albedo = RandomColor() * RandomColor();
-						materialParameter = albedo;
-					}
-					else if (chooseMat < 0.95)
-					{
-						// metal
-						materialType = METALLIC;
-						float fuzz = RandomFloat(0.0f, 0.5f);
-						materialParameter = { RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), fuzz };
-					}
-					else
-					{
-						// glass
-						materialType = DIELECTRIC;
-						materialParameter = { 1.5f, 1.5f, 1.5f, 1.5f };
-					}
-
-					Geometry geom = {};
-					if (!CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
-					{
-#ifdef _DEBUG
-						__debugbreak();
-#endif
-						return false;
-					}
-					DirectX::XMFLOAT4 float4Material;
-					DirectX::XMStoreFloat4(&float4Material, materialParameter);
-
-					geom.Albedo = float4Material;
-					geom.MaterialID = materialType;
-					geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslationFromVector(center));
-					m_Geometry.push_back(geom);
+					// diffuse
+					geom.MaterialID = LAMBERTIAN;
+					DirectX::XMStoreFloat4(&geom.Albedo, RandomColor() * RandomColor());
 				}
+				else if (chooseMat < 0.95)
+				{
+					// metal
+					geom.MaterialID = METALLIC;
+					float fuzz = RandomFloat(0.0f, 0.5f);
+					DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), fuzz));
+				}
+				else
+				{
+					// glass
+					geom.MaterialID = DIELECTRIC;
+					DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(1.5f, 1.5f, 1.5f, 1.5f));
+				}
+				
+				if (!CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+				{
+#ifdef _DEBUG
+					__debugbreak();
+#endif
+					return false;
+				}
+
+				Matrix transform = Matrix::CreateTranslation(center);
+				geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+
+				m_Geometry.push_back(geom);
+				totalNumIndices += geom.Indices.size();
+				totalNumVertices += geom.Vertices.size();
 			}
 		}
+
 		{
 			Geometry geom = {};
 			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
@@ -907,12 +933,16 @@ bool Renderer::BuildGeometry()
 				return false;
 			}
 
-			geom.Albedo = { 1.5f, 1.5f, 1.5f, 1.5f };
+			geom.Albedo = DirectX::XMFLOAT4(1.5f, 1.5f, 1.5f, 1.5f);
 			geom.MaterialID = DIELECTRIC;
-			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(0.0f, 1.0f, 0.0f));
-			m_Geometry.push_back(geom);
-		}
 
+			Matrix transform = Matrix::CreateTranslation(Vector3::UnitY);
+			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+
+			m_Geometry.push_back(geom);
+			totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();
+		}
 		{
 			Geometry geom = {};
 			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
@@ -923,12 +953,17 @@ bool Renderer::BuildGeometry()
 				return false;
 			}
 
-			geom.Albedo = { 0.4f, 0.2f, 0.1f, 0.0f };
+			geom.Albedo = DirectX::XMFLOAT4(0.4f, 0.2f, 0.1f, 0.0f);
 			geom.MaterialID = LAMBERTIAN;
-			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMMatrixTranslation(-4.0f, 1.0f, 0.0f));
-			m_Geometry.push_back(geom);
-		}
 
+			Vector3 pos(4.0f, 1.0f, 0.0f);
+			Matrix transform = Matrix::CreateTranslation(pos);
+			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+
+			m_Geometry.push_back(geom);
+			totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();
+		}
 		{
 			Geometry geom = {};
 			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
@@ -939,16 +974,18 @@ bool Renderer::BuildGeometry()
 				return false;
 			}
 
-			geom.Albedo = { 0.7f, 0.6f, 0.5f, 0.0f };
+			geom.Albedo = DirectX::XMFLOAT4(0.7f, 0.6f, 0.5f, 0.0f);
 			geom.MaterialID = METALLIC;
-			geom.Transform = XMMatrixTranspose(XMMatrixTranslation(4.0f, 1.0f, 0.0f));
+
+			Vector3 pos(-4.0f, 1.0f, 0.0f);
+			Matrix transform = Matrix::CreateTranslation(pos);
+			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+
 			m_Geometry.push_back(geom);
+			totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();
 		}
 	}
-
-
-	SIZE_T totalNumIndices = 0;
-	SIZE_T totalNumVertices = 0;
 
 	for (Geometry const& geometry : m_Geometry)
 	{
@@ -956,7 +993,7 @@ bool Renderer::BuildGeometry()
 		totalNumVertices += geometry.Vertices.size();
 	}
 
-	std::vector<UINT32> indices(totalNumIndices);
+	std::vector<Index> indices(totalNumIndices);
 	std::vector<Vertex> vertices(totalNumVertices);
 	SIZE_T vertexOffset = 0;
 	SIZE_T indexOffset = 0;
@@ -977,7 +1014,7 @@ bool Renderer::BuildGeometry()
 #endif
 		return false;
 	}
-	if (!AllocateUploadBuffer(indices.data(), indices.size() * sizeof(UINT32), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
+	if (!AllocateUploadBuffer(indices.data(), indices.size() * sizeof(Index), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
 	{
 #ifdef _DEBUG
 		__debugbreak();
@@ -988,7 +1025,7 @@ bool Renderer::BuildGeometry()
 
 	// Vertex buffer is passed to the shader along with index buffer as a descriptor table.
 	// Vertex buffer descriptor must follow index buffer descriptor in the descriptor heap.
-	UINT descriptorIndexIB = CreateBufferSRV(&m_IndexBuffer, (UINT)indices.size(), sizeof(UINT32));
+	UINT descriptorIndexIB = CreateBufferSRV(&m_IndexBuffer, (UINT)indices.size(), sizeof(Index));
 	UINT descriptorIndexVB = CreateBufferSRV(&m_VertexBuffer, (UINT)vertices.size(), sizeof(Vertex));
 	if (descriptorIndexVB != descriptorIndexIB + 1)
 	{
@@ -1411,14 +1448,12 @@ UINT Renderer::CreateBufferSRV(D3DBuffer* pOutBuffer, UINT numElements, UINT ele
 
 void Renderer::UpdateCameraMatrices()
 {
-	m_FrameCB[m_FrameIndex].CameraPosition = m_Eye;
-	float fovAngleY = 45.0f;
-	XMMATRIX view = DirectX::XMMatrixLookAtLH(m_Eye, m_At, m_Up);
-	XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
-	//XMMATRIX viewProj = view * proj;
+	m_FrameCB[m_FrameIndex].CameraPosition = m_Camera.GetEyePos();
+	DirectX::XMMATRIX view = m_Camera.GetView();
+	DirectX::XMMATRIX proj = m_Camera.GetProjection();
 
-	m_FrameCB[m_FrameIndex].ProjectionToWorld = DirectX::XMMatrixInverse(nullptr, proj);
-	m_FrameCB[m_FrameIndex].ModelViewInverse = DirectX::XMMatrixInverse(nullptr, view);
+	m_FrameCB[m_FrameIndex].ProjectionToWorld = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, proj));
+	m_FrameCB[m_FrameIndex].ModelViewInverse = DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, view));
 }
 
 void Renderer::Prepare(D3D12_RESOURCE_STATES beforeState)

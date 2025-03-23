@@ -70,6 +70,14 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ExternalIncludePath>;E:\OWL_Git\RaytracingOneWeekPractice\ray3DXR_v2\ray3DXR_v2\External\DirectXTK12\Inc</ExternalIncludePath>
+    <LibraryPath>E:\OWL_Git\RaytracingOneWeekPractice\ray3DXR_v2\ray3DXR_v2\lib\debug;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ExternalIncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);;E:\OWL_Git\RaytracingOneWeekPractice\ray3DXR_v2\ray3DXR_v2\External\DirectXTK12\Inc</ExternalIncludePath>
+    <LibraryPath>E:\OWL_Git\RaytracingOneWeekPractice\ray3DXR_v2\ray3DXR_v2\lib\release;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -127,12 +135,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="CommonTypes.h" />
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GeometryUtil.h" />
     <ClInclude Include="GPUResources.h" />
     <ClInclude Include="HLSLCompat.h" />
+    <ClInclude Include="KnM.h" />
     <ClInclude Include="MathUtil.h" />
     <ClInclude Include="ray3DXR_v2.h" />
     <ClInclude Include="RaytracingHLSLCompat.h" />
@@ -142,6 +152,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="GeometryUtil.cpp" />
     <ClCompile Include="GPUResources.cpp" />
     <ClCompile Include="MathUtil.cpp" />

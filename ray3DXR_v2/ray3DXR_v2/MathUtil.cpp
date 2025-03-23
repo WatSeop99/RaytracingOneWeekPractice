@@ -30,3 +30,16 @@ DirectX::XMVECTOR __vectorcall RandomColor()
 {
 	return { RandomFloat(), RandomFloat(), RandomFloat() };
 }
+
+float Min(float a, float b)
+{
+	return (a < b ? a : b);
+}
+float Max(float a, float b)
+{
+	return (a > b ? a : b);
+}
+float Clamp(float val, float lower, float upper)
+{
+	return Min(Max(val, lower), upper);
+}

@@ -68,6 +68,81 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 
+	case WM_MOUSEMOVE:
+	{
+		if (pRenderer)
+		{
+			pRenderer->ProcessMosuseMove(LOWORD(lParam), HIWORD(lParam));
+		}
+
+		break;
+	}
+
+	case WM_LBUTTONDOWN:
+	{
+		if (pRenderer)
+		{
+			pRenderer->SetMouseLButton(true);
+		}
+
+		break;
+	}
+
+	case WM_LBUTTONUP:
+	{
+		if (pRenderer)
+		{
+			pRenderer->SetMouseLButton(false);
+		}
+
+		break;
+	}
+
+	case WM_RBUTTONDOWN:
+	{
+		if (pRenderer)
+		{
+			pRenderer->SetMouseRButton(true);
+		}
+
+		break;
+	}
+
+	case WM_RBUTTONUP:
+	{
+		if (pRenderer)
+		{
+			pRenderer->SetMouseRButton(false);
+		}
+
+		break;
+	}
+
+	case WM_KEYDOWN:
+	{
+		if (pRenderer)
+		{
+			if (wParam == VK_ESCAPE)
+			{
+				PostQuitMessage(0);
+				break;
+			}
+			pRenderer->SetKeyboardKey(wParam, true);
+		}
+
+		break;
+	}
+
+	case WM_KEYUP:
+	{
+		if (pRenderer)
+		{
+			pRenderer->SetKeyboardKey(wParam, false);
+		}
+
+		break;
+	}
+
 	case WM_QUIT:
 	case WM_DESTROY:
 		PostQuitMessage(0);

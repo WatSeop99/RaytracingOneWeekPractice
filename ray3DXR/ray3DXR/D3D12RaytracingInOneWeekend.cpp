@@ -159,7 +159,8 @@ void D3D12RaytracingInOneWeekend::UpdateCameraMatrices()
 	//float fovAngleY = 20.0f;
 	float fovAngleY = 45.0f;
 	XMMATRIX view = XMMatrixLookAtLH(m_Eye, m_At, m_Up);
-	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
+	//XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_AspectRatio, 0.1f, 10000.0f);
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(fovAngleY, m_AspectRatio, 0.1f, 10000.0f);
 	//XMMATRIX viewProj = view * proj;
 
 	m_FrameCB[frameIndex].ProjectionToWorld = XMMatrixInverse(nullptr, proj);
@@ -193,7 +194,7 @@ void D3D12RaytracingInOneWeekend::CreateConstantBuffers()
 	UINT frameCount = m_pDeviceResources->GetBackBufferCount();
 
 	// Create the constant buffer memory and map the CPU and GPU addresses
-	const D3D12_HEAP_PROPERTIES UPLOAD_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const CD3DX12_HEAP_PROPERTIES UPLOAD_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
 	// Allocate one constant buffer per frame, since it gets updated every frame.
 	SIZE_T cbSize = frameCount * sizeof(AlignedSceneConstantBuffer);
@@ -456,7 +457,7 @@ inline double random_double()
 
 inline float random_float(float from, float to)
 {
-	static std::uniform_real_distribution<float> s_Distribution(0.0, 1.0);
+	static std::uniform_real_distribution<float> s_Distribution(from, to);
 	static std::mt19937 s_Generator;
 	return s_Distribution(s_Generator);
 }
@@ -844,6 +845,18 @@ void D3D12RaytracingInOneWeekend::OnUpdate()
 		m_Up = XMVector3Transform(m_Up, rotate);
 		m_At = XMVector3Transform(m_At, rotate);
 		UpdateCameraMatrices();
+	}
+
+	{
+		WCHAR szDebugString[256];
+		swprintf_s(szDebugString, 256, L"CameraPosition: (%f, %f, %f)\n", m_Eye.m128_f32[0], m_Eye.m128_f32[1], m_Eye.m128_f32[2]);
+		OutputDebugString(szDebugString);
+
+		swprintf_s(szDebugString, 256, L"UpVector: (%f, %f, %f)\n", m_Up.m128_f32[0], m_Up.m128_f32[1], m_Up.m128_f32[2]);
+		OutputDebugString(szDebugString);
+
+		swprintf_s(szDebugString, 256, L"AtVector: (%f, %f, %f)\n", m_At.m128_f32[0], m_At.m128_f32[1], m_At.m128_f32[2]);
+		OutputDebugString(szDebugString);
 	}
 }
 

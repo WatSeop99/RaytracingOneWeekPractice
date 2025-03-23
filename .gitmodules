@@ -1,0 +1,3 @@
+[submodule "ray3DXR_v2/ray3DXR_v2/External/DirectXTK12"]
+	path = ray3DXR_v2/ray3DXR_v2/External/DirectXTK12
+	url = https://github.com/microsoft/DirectXTK12.git

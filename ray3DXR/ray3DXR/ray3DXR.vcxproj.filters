@@ -103,8 +103,8 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Random.hlsl">
+    <None Include="Random.hlsl">
       <Filter>Shader Files</Filter>
-    </Text>
+    </None>
   </ItemGroup>
 </Project>
