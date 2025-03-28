@@ -1045,19 +1045,21 @@ bool Renderer::BuildAccelerationStructures()
 	_ASSERT(m_ppCommandAllocators[m_FrameIndex]);
 	_ASSERT(!m_pTopLevelAccelerationStructure);
 
+	ID3D12GraphicsCommandList4* pCommandList = m_ppCommandLists[m_FrameIndex];
+
 	std::vector<ID3D12Resource*> scratches; // just to expand lifetime
 	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescriptors;
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs;
 
 	// Reset the command list for the acceleration structure construction.
-	m_ppCommandLists[m_FrameIndex]->Reset(m_ppCommandAllocators[m_FrameIndex], nullptr);
+	pCommandList->Reset(m_ppCommandAllocators[m_FrameIndex], nullptr);
 
 	int i = 0;
 	for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
 	{
 		Geometry& geometry = m_Geometry[i];
-		ID3D12Resource2*& pBottomLevelAccelerationStructure = geometry.pBottomLevelAccelerationStructure;
-		_ASSERT(!pBottomLevelAccelerationStructure);
+		ID3D12Resource2** ppBottomLevelAccelerationStructure = &geometry.pBottomLevelAccelerationStructure;
+		_ASSERT(ppBottomLevelAccelerationStructure && !*ppBottomLevelAccelerationStructure);
 
 		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -1094,7 +1096,7 @@ bool Renderer::BuildAccelerationStructures()
 		}
 
 		D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-		if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)&pBottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure"))
+		if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)ppBottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure"))
 		{
 #ifdef _DEBUG
 			__debugbreak();
@@ -1102,12 +1104,30 @@ bool Renderer::BuildAccelerationStructures()
 			return false;
 		}
 
+		/*
+		* 실험해볼 것. 
+		* 만약, 0.2f짜리 구를 blas 하나만 사용해서 쓸 수 있으면,
+		* 초기에 blas 하나 생성해서 캐싱하고,
+		* 이거 사용해서 instance desc만 바꿔주면 된다.
+		* 
+		* 캐싱된 ID3D12Resource는 밑에 있는 D3D12_RAYTRACING_INSTANCE_DESC의 AccelerationStructure에 넣어주고,
+		* instanceID, mask, InstanceContributionToHitGroupIndex는 그대로 써주면 된다.
+		* 
+		* 이걸 같게 맞추면 안돼나? 생각할 수 있는데,
+		* Tlas와 Blas의 존재 의의를 잘생각해보면 답은 간단하다.
+		* Tlas는 Blas를 참조하는 instance들의 모음을 구성한 것이다.
+		* 즉, 렌더링에 필요한 instance들은 모두 1개씩 존재해야한다. 
+		* 이는 각 instance가 GPU에서 작업될때, 작업되는 셰이더를 한 세트로 판별하여 구분하기 위함이다.
+		* 그러니깐, instance-hit sharder 짝을 각각 구분하기 위해 붙여주는 인덱스다.
+		* 그래서 이건 instance마다 각각 구분하는게 맞으니, i 그대로 유지하는거다.
+		*/
+
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
 		instanceDesc.InstanceMask = 1;
 		instanceDesc.InstanceID = i;
 		instanceDesc.InstanceContributionToHitGroupIndex = i;
-		instanceDesc.AccelerationStructure = pBottomLevelAccelerationStructure->GetGPUVirtualAddress();
+		instanceDesc.AccelerationStructure = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
 
 		instanceDescriptors.push_back(instanceDesc);
 
@@ -1124,13 +1144,13 @@ bool Renderer::BuildAccelerationStructures()
 		// Bottom Level Acceleration Structure desc
 		{
 			bottomLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
-			bottomLevelBuildDesc.DestAccelerationStructureData = pBottomLevelAccelerationStructure->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
 		}
 
 		// Build acceleration structure.
-		m_ppCommandLists[m_FrameIndex]->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(pBottomLevelAccelerationStructure);
-		m_ppCommandLists[m_FrameIndex]->ResourceBarrier(1, &barrier);
+		pCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(*ppBottomLevelAccelerationStructure);
+		pCommandList->ResourceBarrier(1, &barrier);
 
 		++i;
 	}
@@ -1183,7 +1203,7 @@ bool Renderer::BuildAccelerationStructures()
 	topLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
 	topLevelBuildDesc.Inputs.InstanceDescs = pInstanceDescs->GetGPUVirtualAddress();
 
-	m_ppCommandLists[m_FrameIndex]->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+	pCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
 	// Kick off acceleration structure construction.
 	ExecuteCommandList();

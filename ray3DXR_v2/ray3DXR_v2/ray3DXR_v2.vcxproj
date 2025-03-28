@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AccelerationStructureManager.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CommonTypes.h" />
     <ClInclude Include="d3dx12.h" />
@@ -152,6 +153,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AccelerationStructureManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="GeometryUtil.cpp" />
     <ClCompile Include="GPUResources.cpp" />
