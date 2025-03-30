@@ -11,17 +11,13 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 	Renderer renderer;
 	if (!renderer.Initialize(hInstance, WndProc, 1280, 720))
 	{
-#ifdef _DEBUG
-		__debugbreak();
-#endif
+		BREAK_IF_FALSE(false);
 		return -1;
 	}
 	renderer.Run();
 	if (!renderer.Cleanup())
 	{
-#ifdef _DEBUG
-		__debugbreak();
-#endif
+		BREAK_IF_FALSE(false);
 		return -1;
 	}
 

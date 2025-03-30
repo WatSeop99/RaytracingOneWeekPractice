@@ -17,6 +17,22 @@ enum LocalRootSignatureParams
 	LocalRootSignatureParams_Count
 };
 
+enum MaterialType
+{
+	MaterialType_Lambertian = 0,
+	MaterialType_Metallic,
+	MaterialType_Dielectric,
+	MaterialType_Count
+};
+enum BLASType
+{
+	BLASType_None = 0,
+	BLASType_Big,
+	BLASType_Middle,
+	BLASType_Small,
+	BLASType_Count
+};
+
 union AlignedSceneConstantBuffer
 {
 	FrameBuffer Constants;
@@ -35,7 +51,6 @@ struct Geometry
 	std::vector<Vertex> Vertices;
 	std::vector<Index> Indices;
 	DirectX::XMFLOAT4 Albedo;
-	int MaterialID;
 
 	DirectX::XMMATRIX Transform;
 
@@ -43,6 +58,16 @@ struct Geometry
 	SIZE_T VerticesOffsetInBytes;
 
 	ID3D12Resource2* pBottomLevelAccelerationStructure;
+	int BLASType;
+
+	int MaterialID;
+};
+
+struct BLASData
+{
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO BottomLevelPrebuildInfo;
+	ID3D12Resource* pBottomLevelAS;
+	UINT64 InstanceContributionToHitGroupIndex;
 };
 
 #define INIT_BUFFER { nullptr, { 0xFFFFFFFFFFFFFFFF, }, { 0xFFFFFFFFFFFFFFFF, } }

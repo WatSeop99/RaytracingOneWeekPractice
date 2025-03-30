@@ -31,13 +31,16 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <map>
 #include <unordered_map>
 
 #define SAFE_COM_RELEASE(x) if (x) { (x)->Release(); (x) = nullptr; }
 
 #ifdef _DEBUG
 #define BREAK_IF_FAILED(hr) if (FAILED(hr)) __debugbreak()
+#define BREAK_IF_FALSE(b)	if (!b) __debugbreak()
 //#define new DEBUG_NEW
 #else
 #define BREAK_IF_FAILED(hr) 
+#define BREAK_IF_FALSE(b)
 #endif

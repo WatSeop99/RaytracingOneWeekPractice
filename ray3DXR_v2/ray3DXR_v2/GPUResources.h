@@ -59,6 +59,7 @@ public:
 	void DebugPrint(std::unordered_map<void*, std::wstring>& shaderIdToStringMap);
 
 	inline UINT GetShaderRecordSize() { return m_ShaderRecordSize; }
+	inline SIZE_T GetNumShaderRecords() { return m_ShaderRecords.size(); }
 
 private:
 	ShaderTable() = default;

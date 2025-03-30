@@ -8,6 +8,9 @@ public:
 
 	void AddBottomlevelAS();
 	UINT AddBottomLevelASInstance();
+	bool InitializeTopLevelAS();
+	bool Build();
+
 
 private:
 
