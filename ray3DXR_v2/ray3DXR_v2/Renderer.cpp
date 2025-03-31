@@ -1087,11 +1087,10 @@ bool Renderer::BuildAccelerationStructures()
 
 			// Get required sizes for an acceleration structure.
 			//D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_MINIMIZE_MEMORY;
-			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 
 			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& bottomLevelInputs = bottomLevelBuildDesc.Inputs;
 			bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-			bottomLevelInputs.Flags = buildFlags;
+			bottomLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 			bottomLevelInputs.NumDescs = 1;
 			bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 			bottomLevelInputs.pGeometryDescs = &geometryDesc;
@@ -1134,15 +1133,20 @@ bool Renderer::BuildAccelerationStructures()
 		* 이는 각 instance가 GPU에서 작업될때, 작업되는 셰이더를 한 세트로 판별하여 구분하기 위함이다.
 		* 그러니깐, instance-hit sharder 짝을 각각 구분하기 위해 붙여주는 인덱스다.
 		* 그래서 이건 instance마다 각각 구분하는게 맞으니, i 그대로 유지하는거다.
+		* 
+		* 여전히 안됨.
+		* 생각해보니, 샘플에서도 같은 머터리얼에 대해서만 blas를 생성하고 인스턴스를 생성했던 것 같음.
+		* 그러면 smallsphere에 대해서도 이를 나눠야 하는걸까?
 		*/
 
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
-		instanceDesc.InstanceMask = 1;
+		//instanceDesc.InstanceMask = 1;
+		instanceDesc.InstanceMask = 0xFF;
 		instanceDesc.InstanceID = i;
 		//instanceDesc.InstanceContributionToHitGroupIndex = i;
-		instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
+		//instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
 		instanceDesc.AccelerationStructure = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
 
 		instanceDescriptors.push_back(instanceDesc);
