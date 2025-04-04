@@ -10,7 +10,7 @@
 ConstantBuffer<FrameBuffer> g_FrameBuffer : register(b0);
 
 RaytracingAccelerationStructure g_Scene : register(t0, space0);
-StructuredBuffer<int> g_Indices : register(t1, space0);
+StructuredBuffer<uint> g_Indices : register(t1, space0);
 StructuredBuffer<Vertex> g_Vertices : register(t2, space0);
 
 RWTexture2D<float4> g_RenderTarget : register(u0);
@@ -19,6 +19,7 @@ RWTexture2D<float4> g_RenderTarget : register(u0);
 // Local resources.
 
 ConstantBuffer<MeshBuffer> l_MeshBuffer : register(b1);
+
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
@@ -179,16 +180,17 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     uint baseIdx = indicesPerTriangle * PrimitiveIndex();
     uint indexWithOffset = baseIdx + l_MeshBuffer.IndicesOffset;
     
-    int i0 = g_Indices[indexWithOffset + 0];
+    int i0 = g_Indices[indexWithOffset];
     int i1 = g_Indices[indexWithOffset + 1];
     int i2 = g_Indices[indexWithOffset + 2];
 
     // Retrieve corresponding vertex normals for the triangle vertices.
+    float3x3 transform = (float3x3) ObjectToWorld3x4();
     float3 vertexNormals[3] =
     {
-        g_Vertices[i0 + l_MeshBuffer.VerticesOffset].Normal,
-        g_Vertices[i1 + l_MeshBuffer.VerticesOffset].Normal,
-        g_Vertices[i2 + l_MeshBuffer.VerticesOffset].Normal 
+        mul(transform, g_Vertices[i0 + l_MeshBuffer.VerticesOffset].Normal),
+        mul(transform, g_Vertices[i1 + l_MeshBuffer.VerticesOffset].Normal),
+        mul(transform, g_Vertices[i2 + l_MeshBuffer.VerticesOffset].Normal)
     };
 
     // Compute the triangle's normal.
@@ -200,18 +202,20 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     int materialId = l_MeshBuffer.MaterialID;
     switch (materialId)
     {
-        case 0:
+        case 0: // Lambertian
             payload = ScatterLambertian(l_MeshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.Seed);
             break;
         
-        case 1:
+        case 1: // Metal
             payload = ScatterMetal(l_MeshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.Seed);
             break;
         
-        case 2:
-            float refractionIndex = l_MeshBuffer.Albedo.x;
-            payload = ScatterDielectric(l_MeshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.Seed, refractionIndex);
-            break;
+        case 2: // Dielectric
+            {
+                float refractionIndex = l_MeshBuffer.Albedo.x;
+                payload = ScatterDielectric(l_MeshBuffer.Albedo, worlRayDirection, triangleNormal, t, payload.Seed, refractionIndex);
+                break;
+            }
     }
 }
 

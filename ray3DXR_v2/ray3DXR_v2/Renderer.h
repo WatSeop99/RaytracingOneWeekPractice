@@ -131,7 +131,7 @@ private:
 	FrameBuffer m_FrameCB[MAX_BACK_BUFFER_COUNT] = {};
 
 	std::vector<Geometry> m_Geometry;
-	std::map<std::string, BLASData> m_BuildTypeCache;
+	std::map<std::string, BLASData> m_BLASTypeCache;
 	UINT m_InstanceContributionToHitGroupIndex = 0;
 	UINT m_HitgroupShaderTableSize = 0;
 	D3DBuffer m_VertexBuffer = INIT_BUFFER;

@@ -27,9 +27,9 @@ enum MaterialType
 enum BLASType
 {
 	BLASType_None = 0,
-	BLASType_Big,
-	BLASType_Middle,
-	BLASType_Small,
+	BLASType_BigSphere,
+	BLASType_MiddleSphere,
+	BLASType_SmallSphere,
 	BLASType_Count
 };
 

@@ -102,12 +102,12 @@ bool Renderer::Cleanup()
 	{
 		SAFE_COM_RELEASE(m_Geometry[i].pBottomLevelAccelerationStructure);
 	}*/
-	for (auto iter = m_BuildTypeCache.begin(), endIter = m_BuildTypeCache.end(); iter != endIter; ++iter)
+	for (auto iter = m_BLASTypeCache.begin(), endIter = m_BLASTypeCache.end(); iter != endIter; ++iter)
 	{
 		SAFE_COM_RELEASE(iter->second.pBottomLevelAS);
 	}
 	m_Geometry.clear();
-	m_BuildTypeCache.clear();
+	m_BLASTypeCache.clear();
 
 	SAFE_COM_RELEASE(m_pFrameConstants);
 	if (m_pMappedConstantData)
@@ -511,7 +511,7 @@ bool Renderer::InitScene()
 	{
 		// Initialize the view and projection inverse matrices.
 		m_Camera.SetAspectRatio(m_AspectRatio);
-		m_Camera.SetEyePos(Vector3(13.0f, 2.0f, -10.0f));
+		m_Camera.SetEyePos(DirectX::SimpleMath::Vector3(13.0f, 2.0f, -10.0f));
 		m_Camera.SetViewDir(-m_Camera.GetEyePos());
 
 		UpdateCameraMatrices();
@@ -701,7 +701,7 @@ bool Renderer::CreateRaytracingOutput()
 	{
 		return false;
 	}
-	
+
 	// Create the output resource.The dimensions and format should match the swap - chain.
 	CD3DX12_RESOURCE_DESC uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(m_BackBufferFormat, m_Width, m_Height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
@@ -846,84 +846,87 @@ bool Renderer::BuildGeometry()
 
 		geom.Albedo = { 0.5f, 0.5f, 0.5f, 1.0f };
 		geom.MaterialID = MaterialType_Lambertian;
-		geom.BLASType = BLASType_Big;
+		geom.BLASType = BLASType_BigSphere;
 
-		Vector3 pos(0.0f, -1000.0f, 0.0f);
-		Matrix transform = Matrix::CreateTranslation(pos);
+		DirectX::SimpleMath::Vector3 pos(0.0f, -1000.0f, 0.0f);
+		DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
 		geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 		m_Geometry.push_back(geom);
 		totalNumIndices += geom.Indices.size();
 		totalNumVertices += geom.Vertices.size();
 
-		m_BuildTypeCache.insert(std::make_pair("BigSphere", initBLASData));
+		m_BLASTypeCache.insert(std::make_pair("BigSphere", initBLASData));
 	}
 
-	for (int a = -11; a < 11; ++a)
 	{
-		for (int b = -11; b < 11; ++b)
+		Geometry geom = {};
+		if (!CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
 		{
-			Geometry geom = {};
-
-			double chooseMat = RandomDouble();
-			Vector3 center((float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat());
-			float length = (center - Vector3(4.0f, 0.2f, 0.0f)).Length();
-
-			geom.BLASType = BLASType_Small;
-
-			if (length > 0.9f)
-			{
-				int materialType = 0;
-
-				if (chooseMat < 0.8)
-				{
-					// diffuse
-					geom.MaterialID = MaterialType_Lambertian;
-					DirectX::XMStoreFloat4(&geom.Albedo, RandomColor() * RandomColor());
-				}
-				else if (chooseMat < 0.95)
-				{
-					// metal
-					geom.MaterialID = MaterialType_Metallic;
-					float fuzz = RandomFloat(0.0f, 0.5f);
-					DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), fuzz));
-				}
-				else
-				{
-					// glass
-					geom.MaterialID = MaterialType_Dielectric;
-					DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(1.5f, 1.5f, 1.5f, 1.5f));
-				}
-				
-				if (!CreateSphere(0.2f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
-				{
-					BREAK_IF_FALSE(false);
-					return false;
-				}
-
-				Matrix transform = Matrix::CreateTranslation(center);
-				geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
-
-				m_Geometry.push_back(geom);
-				totalNumIndices += geom.Indices.size();
-				totalNumVertices += geom.Vertices.size();
-			}
+			BREAK_IF_FALSE(false);
+			return false;
 		}
-		m_BuildTypeCache.insert(std::make_pair("SmallSphere", initBLASData));
+		for (int a = -11; a < 11; ++a)
+		{
+			for (int b = -11; b < 11; ++b)
+			{
+				double chooseMat = RandomDouble();
+				DirectX::SimpleMath::Vector3 center((float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat());
+				float length = (center - DirectX::SimpleMath::Vector3(4.0f, 0.2f, 0.0f)).Length();
+
+				geom.BLASType = BLASType_SmallSphere;
+
+				if (length > 0.9f)
+				{
+					int materialType = 0;
+
+					if (chooseMat < 0.8)
+					{
+						// diffuse
+						geom.MaterialID = MaterialType_Lambertian;
+						DirectX::XMStoreFloat4(&geom.Albedo, RandomColor() * RandomColor());
+					}
+					else if (chooseMat < 0.95)
+					{
+						// metal
+						geom.MaterialID = MaterialType_Metallic;
+						float fuzz = RandomFloat(0.0f, 0.5f);
+						DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), RandomFloat(0.5f, 1.0f), fuzz));
+					}
+					else
+					{
+						// glass
+						geom.MaterialID = MaterialType_Dielectric;
+						DirectX::XMStoreFloat4(&geom.Albedo, DirectX::XMVectorSet(1.5f, 1.5f, 1.5f, 1.5f));
+					}
+
+
+
+					DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(center);
+					geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+
+					m_Geometry.push_back(geom);
+					totalNumIndices += geom.Indices.size();
+					totalNumVertices += geom.Vertices.size();
+				}
+			}
+			m_BLASTypeCache.insert(std::make_pair("SmallSphere", initBLASData));
+		}
+	}
+	{
+		Geometry geom = {};
+		if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
+		{
+			BREAK_IF_FALSE(false);
+			return false;
+		}
 
 		{
-			Geometry geom = {};
-			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
-			{
-				BREAK_IF_FALSE(false);
-				return false;
-			}
-
 			geom.Albedo = DirectX::XMFLOAT4(1.5f, 1.5f, 1.5f, 1.5f);
 			geom.MaterialID = MaterialType_Dielectric;
-			geom.BLASType = BLASType_Middle;
+			geom.BLASType = BLASType_MiddleSphere;
 
-			Matrix transform = Matrix::CreateTranslation(Vector3::UnitY);
+			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3::UnitY);
 			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 			m_Geometry.push_back(geom);
@@ -931,19 +934,12 @@ bool Renderer::BuildGeometry()
 			totalNumVertices += geom.Vertices.size();
 		}
 		{
-			Geometry geom = {};
-			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
-			{
-				BREAK_IF_FALSE(false);
-				return false;
-			}
-
 			geom.Albedo = DirectX::XMFLOAT4(0.4f, 0.2f, 0.1f, 0.0f);
 			geom.MaterialID = MaterialType_Lambertian;
-			geom.BLASType = BLASType_Middle;
+			geom.BLASType = BLASType_MiddleSphere;
 
-			Vector3 pos(4.0f, 1.0f, 0.0f);
-			Matrix transform = Matrix::CreateTranslation(pos);
+			DirectX::SimpleMath::Vector3 pos(4.0f, 1.0f, 0.0f);
+			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
 			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 			m_Geometry.push_back(geom);
@@ -951,46 +947,109 @@ bool Renderer::BuildGeometry()
 			totalNumVertices += geom.Vertices.size();
 		}
 		{
-			Geometry geom = {};
-			if (!CreateSphere(1.0f, SLICE_COUNT, STACK_COUNT, &geom.Vertices, &geom.Indices))
-			{
-				BREAK_IF_FALSE(false);
-				return false;
-			}
-
 			geom.Albedo = DirectX::XMFLOAT4(0.7f, 0.6f, 0.5f, 0.0f);
 			geom.MaterialID = MaterialType_Metallic;
-			geom.BLASType = BLASType_Middle;
+			geom.BLASType = BLASType_MiddleSphere;
 
-			Vector3 pos(-4.0f, 1.0f, 0.0f);
-			Matrix transform = Matrix::CreateTranslation(pos);
+			DirectX::SimpleMath::Vector3 pos(-4.0f, 1.0f, 0.0f);
+			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
 			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 			m_Geometry.push_back(geom);
 			totalNumIndices += geom.Indices.size();
 			totalNumVertices += geom.Vertices.size();
 		}
-		m_BuildTypeCache.insert(std::make_pair("MiddleSphere", initBLASData));
+
+		m_BLASTypeCache.insert(std::make_pair("MiddleSphere", initBLASData));
 	}
 
-	for (Geometry const& geometry : m_Geometry)
+
+	/*for (Geometry const& geometry : m_Geometry)
 	{
 		totalNumIndices += geometry.Indices.size();
 		totalNumVertices += geometry.Vertices.size();
-	}
+	}*/
+	/*for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
+	{
+		Geometry& geom = m_Geometry[i];
+		switch (geom.BLASType)
+		{
+		case BLASType_BigSphere:
+			if (!bDataInsertFlags[BLASType_BigSphere])
+			{
+				bDataInsertFlags[BLASType_BigSphere] = true;
+				totalNumIndices += geom.Indices.size();
+				totalNumVertices += geom.Vertices.size();
+			}
+			break;
+
+		case BLASType_MiddleSphere:
+			if (!bDataInsertFlags[BLASType_MiddleSphere])
+			{
+				bDataInsertFlags[BLASType_MiddleSphere] = true;
+				totalNumIndices += geom.Indices.size();
+				totalNumVertices += geom.Vertices.size();
+			}
+			break;
+
+		case BLASType_SmallSphere:
+			if (!bDataInsertFlags[BLASType_SmallSphere])
+			{
+				bDataInsertFlags[BLASType_SmallSphere] = true;
+				totalNumIndices += geom.Indices.size();
+				totalNumVertices += geom.Vertices.size();
+			}
+			break;
+
+		default:
+			BREAK_IF_FALSE(false);
+			break;
+		}
+	}*/
 
 	std::vector<Index> indices(totalNumIndices);
 	std::vector<Vertex> vertices(totalNumVertices);
 	SIZE_T vertexOffset = 0;
 	SIZE_T indexOffset = 0;
-	for(SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
+	bool bDataInsertFlags[BLASType_Count] = { false, };
+	for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
 	{
 		Geometry& geom = m_Geometry[i];
 
-		memcpy(&vertices[vertexOffset], geom.Vertices.data(), geom.Vertices.size() * sizeof(geom.Vertices[0]));
-		memcpy(indices.data() + indexOffset, geom.Indices.data(), geom.Indices.size() * sizeof(geom.Indices[0]));
-		geom.IndicesOffsetInBytes = indexOffset * sizeof(geom.Indices[0]);
-		geom.VerticesOffsetInBytes = vertexOffset * sizeof(geom.Vertices[0]);
+		switch (geom.BLASType)
+		{
+		case BLASType_BigSphere:
+			if (bDataInsertFlags[BLASType_BigSphere])
+			{
+				continue;
+			}
+			break;
+
+		case BLASType_MiddleSphere:
+			if (bDataInsertFlags[BLASType_MiddleSphere])
+			{
+				continue;
+			}
+			break;
+
+		case BLASType_SmallSphere:
+			if (bDataInsertFlags[BLASType_SmallSphere])
+			{
+				continue;
+			}
+			break;
+
+		default:
+			BREAK_IF_FALSE(false);
+			break;
+		}
+
+		bDataInsertFlags[geom.BLASType] = true;
+
+		memcpy(&vertices[vertexOffset], geom.Vertices.data(), geom.Vertices.size() * sizeof(Vertex));
+		memcpy(indices.data() + indexOffset, geom.Indices.data(), geom.Indices.size() * sizeof(Index));
+		geom.IndicesOffsetInBytes = indexOffset * sizeof(Index);
+		geom.VerticesOffsetInBytes = vertexOffset * sizeof(Vertex);
 
 		vertexOffset += geom.Vertices.size();
 		indexOffset += geom.Indices.size();
@@ -1037,6 +1096,7 @@ bool Renderer::BuildAccelerationStructures()
 	pCommandList->Reset(m_ppCommandAllocators[m_FrameIndex], nullptr);
 
 	int i = 0;
+	std::map<std::string, BLASData>::iterator endIter = m_BLASTypeCache.end();
 	for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
 	{
 		Geometry& geometry = m_Geometry[i];
@@ -1046,28 +1106,28 @@ bool Renderer::BuildAccelerationStructures()
 		std::map<std::string, BLASData>::iterator iter;
 		switch (geometry.BLASType)
 		{
-		case BLASType_Big:
-			iter = m_BuildTypeCache.find("BigSphere");
+		case BLASType_BigSphere:
+			iter = m_BLASTypeCache.find("BigSphere");
 			break;
 
-		case BLASType_Middle:
-			iter = m_BuildTypeCache.find("MiddleSphere");
+		case BLASType_MiddleSphere:
+			iter = m_BLASTypeCache.find("MiddleSphere");
 			break;
 
-		case BLASType_Small:
-			iter = m_BuildTypeCache.find("SmallSphere");
+		case BLASType_SmallSphere:
+			iter = m_BLASTypeCache.find("SmallSphere");
 			break;
 
 		default:
 			BREAK_IF_FALSE(false);
 			break;
 		}
-		if (iter == m_BuildTypeCache.end())
+		if (iter == endIter)
 		{
 			BREAK_IF_FALSE(false);
 			return false;
 		}
-		
+
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
 		if (iter->second.pBottomLevelAS == nullptr)
@@ -1088,14 +1148,14 @@ bool Renderer::BuildAccelerationStructures()
 			// Get required sizes for an acceleration structure.
 			//D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_MINIMIZE_MEMORY;
 
-			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& bottomLevelInputs = bottomLevelBuildDesc.Inputs;
-			bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-			bottomLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-			bottomLevelInputs.NumDescs = 1;
-			bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-			bottomLevelInputs.pGeometryDescs = &geometryDesc;
-			
-			m_pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS* pBottomLevelInputs = &bottomLevelBuildDesc.Inputs;
+			pBottomLevelInputs->DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+			pBottomLevelInputs->Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+			pBottomLevelInputs->NumDescs = 1;
+			pBottomLevelInputs->Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+			pBottomLevelInputs->pGeometryDescs = &geometryDesc;
+
+			m_pDevice->GetRaytracingAccelerationStructurePrebuildInfo(pBottomLevelInputs, &bottomLevelPrebuildInfo);
 			if (bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes <= 0)
 			{
 				BREAK_IF_FALSE(false);
@@ -1118,22 +1178,22 @@ bool Renderer::BuildAccelerationStructures()
 		}
 
 		/*
-		* 실험해볼 것. 
+		* 실험해볼 것.
 		* 만약, 0.2f짜리 구를 blas 하나만 사용해서 쓸 수 있으면,
 		* 초기에 blas 하나 생성해서 캐싱하고,
 		* 이거 사용해서 instance desc만 바꿔주면 된다.
-		* 
+		*
 		* 캐싱된 ID3D12Resource는 밑에 있는 D3D12_RAYTRACING_INSTANCE_DESC의 AccelerationStructure에 넣어주고,
 		* instanceID, mask, InstanceContributionToHitGroupIndex는 그대로 써주면 된다.
-		* 
+		*
 		* 이걸 같게 맞추면 안돼나? 생각할 수 있는데,
 		* Tlas와 Blas의 존재 의의를 잘생각해보면 답은 간단하다.
 		* Tlas는 Blas를 참조하는 instance들의 모음을 구성한 것이다.
-		* 즉, 렌더링에 필요한 instance들은 모두 1개씩 존재해야한다. 
+		* 즉, 렌더링에 필요한 instance들은 모두 1개씩 존재해야한다.
 		* 이는 각 instance가 GPU에서 작업될때, 작업되는 셰이더를 한 세트로 판별하여 구분하기 위함이다.
 		* 그러니깐, instance-hit sharder 짝을 각각 구분하기 위해 붙여주는 인덱스다.
 		* 그래서 이건 instance마다 각각 구분하는게 맞으니, i 그대로 유지하는거다.
-		* 
+		*
 		* 여전히 안됨.
 		* 생각해보니, 샘플에서도 같은 머터리얼에 대해서만 blas를 생성하고 인스턴스를 생성했던 것 같음.
 		* 그러면 smallsphere에 대해서도 이를 나눠야 하는걸까?
@@ -1311,9 +1371,42 @@ bool Renderer::BuildShaderTables()
 		UINT indicesOffset = 0;
 
 		std::vector<MeshBuffer> args;
+		bool bBLASTypeInsertedFlag[BLASType_Count] = { false, };
 
+		// vertex, index offset을 BLAS cache에 맞춰줘야 한다.
 		for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
 		{
+			Geometry& geom = m_Geometry[i];
+			switch (geom.BLASType)
+			{
+			case BLASType_BigSphere:
+				if (bBLASTypeInsertedFlag[BLASType_BigSphere])
+				{
+					continue;
+				}
+				break;
+
+			case BLASType_MiddleSphere:
+				if (bBLASTypeInsertedFlag[BLASType_MiddleSphere])
+				{
+					continue;
+				}
+				break;
+
+			case BLASType_SmallSphere:
+				if (bBLASTypeInsertedFlag[BLASType_SmallSphere])
+				{
+					continue;
+				}
+				break;
+
+			default:
+				BREAK_IF_FALSE(false);
+				break;
+			}
+
+			bBLASTypeInsertedFlag[geom.BLASType] = true;
+
 			MeshBuffer meshBuffer;
 			meshBuffer.MeshID = (int)i;
 			meshBuffer.MaterialID = m_Geometry[i].MaterialID;
@@ -1340,16 +1433,16 @@ bool Renderer::BuildShaderTables()
 				std::map<std::string, BLASData>::iterator iter;
 				switch (m_Geometry[i].BLASType)
 				{
-				case BLASType_Big:
-					iter = m_BuildTypeCache.find("BigSphere");
+				case BLASType_BigSphere:
+					iter = m_BLASTypeCache.find("BigSphere");
 					break;
 
-				case BLASType_Middle:
-					iter = m_BuildTypeCache.find("MiddleSphere");
+				case BLASType_MiddleSphere:
+					iter = m_BLASTypeCache.find("MiddleSphere");
 					break;
 
-				case BLASType_Small:
-					iter = m_BuildTypeCache.find("SmallSphere");
+				case BLASType_SmallSphere:
+					iter = m_BLASTypeCache.find("SmallSphere");
 					break;
 
 				default:
@@ -1357,7 +1450,7 @@ bool Renderer::BuildShaderTables()
 					break;
 				}
 
-				if (iter == m_BuildTypeCache.end())
+				if (iter == m_BLASTypeCache.end())
 				{
 					BREAK_IF_FALSE(false);
 					return false;
