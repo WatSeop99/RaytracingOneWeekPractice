@@ -1168,13 +1168,30 @@ bool Renderer::BuildAccelerationStructures()
 				return false;
 			}
 
-			memcpy(&iter->second.BottomLevelPrebuildInfo, &bottomLevelPrebuildInfo, sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
+			memcpy(&(iter->second.BottomLevelPrebuildInfo), &bottomLevelPrebuildInfo, sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
 			iter->second.pBottomLevelAS = *ppBottomLevelAccelerationStructure;
+
+
+			ID3D12Resource* pScratchResource = nullptr;
+			if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
+			{
+				BREAK_IF_FALSE(false);
+				return false;
+			}
+			scratches.push_back(pScratchResource); // extend up to execute
+
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
+
+			// Build acceleration structure.
+			pCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(*ppBottomLevelAccelerationStructure);
+			pCommandList->ResourceBarrier(1, &barrier);
 		}
 		else
 		{
-			memcpy(&bottomLevelPrebuildInfo, &iter->second.BottomLevelPrebuildInfo, sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
-			*ppBottomLevelAccelerationStructure = (ID3D12Resource2*)iter->second.pBottomLevelAS;
+			memcpy(&bottomLevelPrebuildInfo, &(iter->second.BottomLevelPrebuildInfo), sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
+			*ppBottomLevelAccelerationStructure = (ID3D12Resource2*)(iter->second.pBottomLevelAS);
 		}
 
 		/*
@@ -1206,29 +1223,10 @@ bool Renderer::BuildAccelerationStructures()
 		instanceDesc.InstanceMask = 0xFF;
 		instanceDesc.InstanceID = i;
 		//instanceDesc.InstanceContributionToHitGroupIndex = i;
-		//instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
+		instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
 		instanceDesc.AccelerationStructure = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
 
 		instanceDescriptors.push_back(instanceDesc);
-
-		ID3D12Resource* pScratchResource = nullptr;
-		if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
-		{
-			BREAK_IF_FALSE(false);
-			return false;
-		}
-		scratches.push_back(pScratchResource); // extend up to execute
-
-		// Bottom Level Acceleration Structure desc
-		{
-			bottomLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
-			bottomLevelBuildDesc.DestAccelerationStructureData = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
-		}
-
-		// Build acceleration structure.
-		pCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(*ppBottomLevelAccelerationStructure);
-		pCommandList->ResourceBarrier(1, &barrier);
 
 		++i;
 	}
@@ -1241,17 +1239,15 @@ bool Renderer::BuildAccelerationStructures()
 	}
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelBuildDesc.Inputs;
-	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	//topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_NONE;
-	topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	topLevelInputs.NumDescs = (UINT)geometryDescs.size();
-	topLevelInputs.pGeometryDescs = geometryDescs.data();
-	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-	topLevelInputs.InstanceDescs = pInstanceDescs->GetGPUVirtualAddress();
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS* pTopLevelInputs = &topLevelBuildDesc.Inputs;
+	pTopLevelInputs->DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	pTopLevelInputs->Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	pTopLevelInputs->NumDescs = (UINT)geometryDescs.size();
+	pTopLevelInputs->Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	pTopLevelInputs->InstanceDescs = pInstanceDescs->GetGPUVirtualAddress();
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-	m_pDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+	m_pDevice->GetRaytracingAccelerationStructurePrebuildInfo(pTopLevelInputs, &topLevelPrebuildInfo);
 	if (topLevelPrebuildInfo.ResultDataMaxSizeInBytes <= 0)
 	{
 		__debugbreak();
@@ -1273,7 +1269,6 @@ bool Renderer::BuildAccelerationStructures()
 	// Top Level Acceleration Structure desc
 	topLevelBuildDesc.DestAccelerationStructureData = m_pTopLevelAccelerationStructure->GetGPUVirtualAddress();
 	topLevelBuildDesc.ScratchAccelerationStructureData = pScratchResource->GetGPUVirtualAddress();
-	//topLevelBuildDesc.Inputs.InstanceDescs = pInstanceDescs->GetGPUVirtualAddress();
 
 	pCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
@@ -1286,31 +1281,31 @@ bool Renderer::BuildAccelerationStructures()
 
 	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
 	{
-		scratches[i]->Release();
+		SAFE_COM_RELEASE(scratches[i]);
 	}
-	pScratchResource->Release();
-	pInstanceDescs->Release();
+	SAFE_COM_RELEASE(pScratchResource);
+	SAFE_COM_RELEASE(pInstanceDescs);
 
 	return true;
 
-LB_FAILED:
-	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
-	{
-		if (scratches[i])
-		{
-			scratches[i]->Release();
-		}
-	}
-	if (pScratchResource)
-	{
-		pScratchResource->Release();
-	}
-	if (pInstanceDescs)
-	{
-		pInstanceDescs->Release();
-	}
-
-	return true;
+//LB_FAILED:
+//	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
+//	{
+//		if (scratches[i])
+//		{
+//			scratches[i]->Release();
+//		}
+//	}
+//	if (pScratchResource)
+//	{
+//		pScratchResource->Release();
+//	}
+//	if (pInstanceDescs)
+//	{
+//		pInstanceDescs->Release();
+//	}
+//
+//	return true;
 }
 
 bool Renderer::BuildShaderTables()
@@ -1428,7 +1423,7 @@ bool Renderer::BuildShaderTables()
 			// 뭔가 돌면서 contributionIndex를 설정해줘야 하는 듯 하다..
 			// 이게 도대체 무슨 역할을 하는지는 모르겠음.
 
-			UINT shaderRecordOffset = hitGroupShaderTable.GetNumShaderRecords();
+			UINT shaderRecordOffset = (UINT)hitGroupShaderTable.GetNumShaderRecords();
 			{
 				std::map<std::string, BLASData>::iterator iter;
 				switch (m_Geometry[i].BLASType)
@@ -1462,7 +1457,7 @@ bool Renderer::BuildShaderTables()
 				}
 
 				WCHAR szDebugString[MAX_PATH] = { 0, };
-				swprintf_s(szDebugString, MAX_PATH, L"%s: %d", iter->first, shaderRecordOffset);
+				swprintf_s(szDebugString, MAX_PATH, L"%s: %u", iter->first.c_str(), shaderRecordOffset);
 				OutputDebugString(szDebugString);
 			}
 
@@ -1512,8 +1507,10 @@ bool Renderer::AllocateUploadBuffer(void* pData, UINT64 dataSize, ID3D12Resource
 
 	if (pData)
 	{
+		CD3DX12_RANGE readRange(0, 0);
 		void* pMappedData = nullptr;
-		hr = (*ppOutResource)->Map(0, nullptr, &pMappedData);
+
+		hr = (*ppOutResource)->Map(0, &readRange, &pMappedData);
 		if (FAILED(hr))
 		{
 			BREAK_IF_FAILED(hr);
