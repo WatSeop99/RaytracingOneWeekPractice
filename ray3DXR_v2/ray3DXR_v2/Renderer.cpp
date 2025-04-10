@@ -1218,12 +1218,15 @@ bool Renderer::BuildAccelerationStructures()
 
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-		memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
+		//memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
+		DirectX::XMMATRIX m = DirectX::XMMatrixTranspose(geometry.Transform);
+		memcpy(instanceDesc.Transform, &m, sizeof(instanceDesc.Transform));
 		//instanceDesc.InstanceMask = 1;
 		instanceDesc.InstanceMask = 0xFF;
 		instanceDesc.InstanceID = i;
-		//instanceDesc.InstanceContributionToHitGroupIndex = i;
-		instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
+		instanceDesc.InstanceContributionToHitGroupIndex = i;
+		//instanceDesc.InstanceContributionToHitGroupIndex = iter->second.InstanceContributionToHitGroupIndex;
+		instanceDesc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
 		instanceDesc.AccelerationStructure = (*ppBottomLevelAccelerationStructure)->GetGPUVirtualAddress();
 
 		instanceDescriptors.push_back(instanceDesc);
@@ -1232,7 +1235,7 @@ bool Renderer::BuildAccelerationStructures()
 	}
 
 	ID3D12Resource* pInstanceDescs = nullptr;
-	if (!AllocateUploadBuffer(instanceDescriptors.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(), &pInstanceDescs, L"InstanceDescs"))
+	if (!AllocateUploadBuffer(instanceDescriptors.data(), ALIGN(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pInstanceDescs, L"InstanceDescs"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
@@ -1255,12 +1258,12 @@ bool Renderer::BuildAccelerationStructures()
 
 
 	ID3D12Resource* pScratchResource = nullptr;
-	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource"))
+	if (!AllocateUAVBuffer(ALIGN(topLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
 	}
-	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)&m_pTopLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure"))
+	if (!AllocateUAVBuffer(ALIGN(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_pTopLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
