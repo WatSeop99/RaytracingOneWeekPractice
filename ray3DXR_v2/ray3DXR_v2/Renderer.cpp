@@ -1054,12 +1054,12 @@ bool Renderer::BuildGeometry()
 		vertexOffset += geom.Vertices.size();
 		indexOffset += geom.Indices.size();
 	}
-	if (!AllocateUploadBuffer(vertices.data(), vertices.size() * sizeof(Vertex), (ID3D12Resource**)&m_VertexBuffer.pResource, L"VertexBuffer"))
+	if (!AllocateUploadBuffer(vertices.data(), ALIGN(vertices.size() * sizeof(Vertex), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_VertexBuffer.pResource, L"VertexBuffer"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
 	}
-	if (!AllocateUploadBuffer(indices.data(), indices.size() * sizeof(Index), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
+	if (!AllocateUploadBuffer(indices.data(), ALIGN(indices.size() * sizeof(Index), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
@@ -1162,7 +1162,7 @@ bool Renderer::BuildAccelerationStructures()
 				return false;
 			}
 
-			if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)ppBottomLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure"))
+			if (!AllocateUAVBuffer(ALIGN(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)ppBottomLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure"))
 			{
 				BREAK_IF_FALSE(false);
 				return false;
@@ -1173,7 +1173,7 @@ bool Renderer::BuildAccelerationStructures()
 
 
 			ID3D12Resource* pScratchResource = nullptr;
-			if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
+			if (!AllocateUAVBuffer(ALIGN(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
 			{
 				BREAK_IF_FALSE(false);
 				return false;
@@ -1219,8 +1219,7 @@ bool Renderer::BuildAccelerationStructures()
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		//memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
-		DirectX::XMMATRIX m = DirectX::XMMatrixTranspose(geometry.Transform);
-		memcpy(instanceDesc.Transform, &m, sizeof(instanceDesc.Transform));
+		memcpy(instanceDesc.Transform, &geometry.Transform.r, sizeof(instanceDesc.Transform));
 		//instanceDesc.InstanceMask = 1;
 		instanceDesc.InstanceMask = 0xFF;
 		instanceDesc.InstanceID = i;

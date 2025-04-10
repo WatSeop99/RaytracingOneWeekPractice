@@ -59,7 +59,7 @@ private:
 	float m_Yaw = -0.0589047f;
 	float m_Pitch = 0.213803f;
 
-	float m_Speed = 30.0f;
+	float m_Speed = 100.0f;
 
 	float m_ProjectionFovAngleY = 45.0f;
 	float m_NearZ = 0.01f;
