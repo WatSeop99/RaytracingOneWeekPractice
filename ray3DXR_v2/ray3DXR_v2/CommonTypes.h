@@ -65,6 +65,10 @@ struct Geometry
 
 struct BLASData
 {
+	std::vector<Vertex> Vertices;
+	std::vector<Index> Indices;
+	SIZE_T VertexOffset;
+	SIZE_T IndexOffset;
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO BottomLevelPrebuildInfo;
 	ID3D12Resource* pBottomLevelAS;
 	UINT64 InstanceContributionToHitGroupIndex;

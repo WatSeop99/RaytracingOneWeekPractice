@@ -829,7 +829,7 @@ void Renderer::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* pRa
 
 bool Renderer::BuildGeometry()
 {
-	BLASData initBLASData = { 0, };
+	BLASData initBLASData = {};
 	const int SLICE_COUNT = 16;
 	const int STACK_COUNT = 32;
 
@@ -850,11 +850,17 @@ bool Renderer::BuildGeometry()
 
 		DirectX::SimpleMath::Vector3 pos(0.0f, -1000.0f, 0.0f);
 		DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
-		geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+		geom.Transform = DirectX::XMLoadFloat4x4(&transform);
 
-		m_Geometry.push_back(geom);
+		initBLASData.Vertices.resize(geom.Vertices.size());
+		initBLASData.Indices.resize(geom.Indices.size());
+		memcpy(initBLASData.Vertices.data(), geom.Vertices.data(), geom.Vertices.size() * sizeof(Vertex));
+		memcpy(initBLASData.Indices.data(), geom.Indices.data(), geom.Indices.size() * sizeof(Index));
+
 		totalNumIndices += geom.Indices.size();
 		totalNumVertices += geom.Vertices.size();
+
+		m_Geometry.push_back(geom);
 
 		m_BLASTypeCache.insert(std::make_pair("BigSphere", initBLASData));
 	}
@@ -866,6 +872,16 @@ bool Renderer::BuildGeometry()
 			BREAK_IF_FALSE(false);
 			return false;
 		}
+		initBLASData.Vertices.clear();
+		initBLASData.Indices.clear();
+		initBLASData.Vertices.resize(geom.Vertices.size());
+		initBLASData.Indices.resize(geom.Indices.size());
+		memcpy(initBLASData.Vertices.data(), geom.Vertices.data(), geom.Vertices.size() * sizeof(Vertex));
+		memcpy(initBLASData.Indices.data(), geom.Indices.data(), geom.Indices.size() * sizeof(Index));
+
+		totalNumIndices += geom.Indices.size();
+		totalNumVertices += geom.Vertices.size();
+
 		for (int a = -11; a < 11; ++a)
 		{
 			for (int b = -11; b < 11; ++b)
@@ -906,8 +922,8 @@ bool Renderer::BuildGeometry()
 					geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
 
 					m_Geometry.push_back(geom);
-					totalNumIndices += geom.Indices.size();
-					totalNumVertices += geom.Vertices.size();
+					/*totalNumIndices += geom.Indices.size();
+					totalNumVertices += geom.Vertices.size();*/
 				}
 			}
 			m_BLASTypeCache.insert(std::make_pair("SmallSphere", initBLASData));
@@ -920,6 +936,15 @@ bool Renderer::BuildGeometry()
 			BREAK_IF_FALSE(false);
 			return false;
 		}
+		initBLASData.Vertices.clear();
+		initBLASData.Indices.clear();
+		initBLASData.Vertices.resize(geom.Vertices.size());
+		initBLASData.Indices.resize(geom.Indices.size());
+		memcpy(initBLASData.Vertices.data(), geom.Vertices.data(), geom.Vertices.size() * sizeof(Vertex));
+		memcpy(initBLASData.Indices.data(), geom.Indices.data(), geom.Indices.size() * sizeof(Index));
+
+		totalNumIndices += geom.Indices.size();
+		totalNumVertices += geom.Vertices.size();
 
 		{
 			geom.Albedo = DirectX::XMFLOAT4(1.5f, 1.5f, 1.5f, 1.5f);
@@ -927,11 +952,11 @@ bool Renderer::BuildGeometry()
 			geom.BLASType = BLASType_MiddleSphere;
 
 			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3::UnitY);
-			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+			geom.Transform = DirectX::XMLoadFloat4x4(&transform);
 
 			m_Geometry.push_back(geom);
-			totalNumIndices += geom.Indices.size();
-			totalNumVertices += geom.Vertices.size();
+			/*totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();*/
 		}
 		{
 			geom.Albedo = DirectX::XMFLOAT4(0.4f, 0.2f, 0.1f, 0.0f);
@@ -940,11 +965,11 @@ bool Renderer::BuildGeometry()
 
 			DirectX::SimpleMath::Vector3 pos(4.0f, 1.0f, 0.0f);
 			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
-			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+			geom.Transform = DirectX::XMLoadFloat4x4(&transform);
 
 			m_Geometry.push_back(geom);
-			totalNumIndices += geom.Indices.size();
-			totalNumVertices += geom.Vertices.size();
+			/*totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();*/
 		}
 		{
 			geom.Albedo = DirectX::XMFLOAT4(0.7f, 0.6f, 0.5f, 0.0f);
@@ -953,11 +978,11 @@ bool Renderer::BuildGeometry()
 
 			DirectX::SimpleMath::Vector3 pos(-4.0f, 1.0f, 0.0f);
 			DirectX::SimpleMath::Matrix transform = DirectX::SimpleMath::Matrix::CreateTranslation(pos);
-			geom.Transform = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&transform));
+			geom.Transform = DirectX::XMLoadFloat4x4(&transform);
 
 			m_Geometry.push_back(geom);
-			totalNumIndices += geom.Indices.size();
-			totalNumVertices += geom.Vertices.size();
+			/*totalNumIndices += geom.Indices.size();
+			totalNumVertices += geom.Vertices.size();*/
 		}
 
 		m_BLASTypeCache.insert(std::make_pair("MiddleSphere", initBLASData));
@@ -1011,7 +1036,7 @@ bool Renderer::BuildGeometry()
 	std::vector<Vertex> vertices(totalNumVertices);
 	SIZE_T vertexOffset = 0;
 	SIZE_T indexOffset = 0;
-	bool bDataInsertFlags[BLASType_Count] = { false, };
+	/*bool bDataInsertFlags[BLASType_Count] = { false, };
 	for (SIZE_T i = 0, size = m_Geometry.size(); i < size; ++i)
 	{
 		Geometry& geom = m_Geometry[i];
@@ -1053,13 +1078,28 @@ bool Renderer::BuildGeometry()
 
 		vertexOffset += geom.Vertices.size();
 		indexOffset += geom.Indices.size();
+	}*/
+	for (std::map<std::string, BLASData>::iterator iter = m_BLASTypeCache.begin(), endIter = m_BLASTypeCache.end(); iter != endIter; ++iter)
+	{
+		BLASData* pBLASData = &(iter->second);
+		std::vector<Vertex>* pVertices = &pBLASData->Vertices;
+		std::vector<Index>* pIndices = &pBLASData->Indices;
+
+		memcpy(vertices.data() + vertexOffset, pVertices->data(), pVertices->size() * sizeof(Vertex));
+		memcpy(indices.data() + indexOffset, pIndices->data(), pIndices->size() * sizeof(Index));
+		pBLASData->VertexOffset = vertexOffset;
+		pBLASData->IndexOffset = indexOffset;
+
+		vertexOffset += pVertices->size();
+		indexOffset += pIndices->size();
 	}
-	if (!AllocateUploadBuffer(vertices.data(), ALIGN(vertices.size() * sizeof(Vertex), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_VertexBuffer.pResource, L"VertexBuffer"))
+
+	if (!AllocateUploadBuffer(vertices.data(), vertices.size() * sizeof(Vertex), (ID3D12Resource**)&m_VertexBuffer.pResource, L"VertexBuffer"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
 	}
-	if (!AllocateUploadBuffer(indices.data(), ALIGN(indices.size() * sizeof(Index), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
+	if (!AllocateUploadBuffer(indices.data(), indices.size() * sizeof(Index), (ID3D12Resource**)&m_IndexBuffer.pResource, L"IndexBuffer"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
@@ -1134,12 +1174,14 @@ bool Renderer::BuildAccelerationStructures()
 		{
 			D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 			geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-			geometryDesc.Triangles.VertexBuffer.StartAddress = m_VertexBuffer.pResource->GetGPUVirtualAddress() + geometry.VerticesOffsetInBytes;
+			//geometryDesc.Triangles.VertexBuffer.StartAddress = m_VertexBuffer.pResource->GetGPUVirtualAddress() + geometry.VerticesOffsetInBytes;
+			geometryDesc.Triangles.VertexBuffer.StartAddress = m_VertexBuffer.pResource->GetGPUVirtualAddress() + iter->second.VertexOffset;
 			geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 			geometryDesc.Triangles.VertexCount = (UINT)geometry.Vertices.size();
 			geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 
-			geometryDesc.Triangles.IndexBuffer = m_IndexBuffer.pResource->GetGPUVirtualAddress() + geometry.IndicesOffsetInBytes;
+			//geometryDesc.Triangles.IndexBuffer = m_IndexBuffer.pResource->GetGPUVirtualAddress() + geometry.IndicesOffsetInBytes;
+			geometryDesc.Triangles.IndexBuffer = m_IndexBuffer.pResource->GetGPUVirtualAddress() + iter->second.IndexOffset;
 			geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 			geometryDesc.Triangles.IndexCount = (UINT)geometry.Indices.size();
 
@@ -1162,7 +1204,7 @@ bool Renderer::BuildAccelerationStructures()
 				return false;
 			}
 
-			if (!AllocateUAVBuffer(ALIGN(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)ppBottomLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure"))
+			if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)ppBottomLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"BottomLevelAccelerationStructure"))
 			{
 				BREAK_IF_FALSE(false);
 				return false;
@@ -1173,7 +1215,7 @@ bool Renderer::BuildAccelerationStructures()
 
 
 			ID3D12Resource* pScratchResource = nullptr;
-			if (!AllocateUAVBuffer(ALIGN(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
+			if (!AllocateUAVBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource"))
 			{
 				BREAK_IF_FALSE(false);
 				return false;
@@ -1219,7 +1261,8 @@ bool Renderer::BuildAccelerationStructures()
 
 		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
 		//memcpy(instanceDesc.Transform, geometry.Transform.r, 12 * sizeof(float));
-		memcpy(instanceDesc.Transform, &geometry.Transform.r, sizeof(instanceDesc.Transform));
+		DirectX::XMMATRIX m = DirectX::XMMatrixTranspose(geometry.Transform);
+		memcpy(instanceDesc.Transform, &m.r, sizeof(instanceDesc.Transform));
 		//instanceDesc.InstanceMask = 1;
 		instanceDesc.InstanceMask = 0xFF;
 		instanceDesc.InstanceID = i;
@@ -1234,7 +1277,7 @@ bool Renderer::BuildAccelerationStructures()
 	}
 
 	ID3D12Resource* pInstanceDescs = nullptr;
-	if (!AllocateUploadBuffer(instanceDescriptors.data(), ALIGN(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instanceDescriptors.size(), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pInstanceDescs, L"InstanceDescs"))
+	if (!AllocateUploadBuffer(instanceDescriptors.data(), instanceDescriptors.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC), &pInstanceDescs, L"InstanceDescs"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
@@ -1257,12 +1300,12 @@ bool Renderer::BuildAccelerationStructures()
 
 
 	ID3D12Resource* pScratchResource = nullptr;
-	if (!AllocateUAVBuffer(ALIGN(topLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource"))
+	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, &pScratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
 	}
-	if (!AllocateUAVBuffer(ALIGN(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), (ID3D12Resource**)&m_pTopLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure"))
+	if (!AllocateUAVBuffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, (ID3D12Resource**)&m_pTopLevelAccelerationStructure, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, L"TopLevelAccelerationStructure"))
 	{
 		BREAK_IF_FALSE(false);
 		return false;
@@ -1289,25 +1332,6 @@ bool Renderer::BuildAccelerationStructures()
 	SAFE_COM_RELEASE(pInstanceDescs);
 
 	return true;
-
-//LB_FAILED:
-//	for (SIZE_T i = 0, size = scratches.size(); i < size; ++i)
-//	{
-//		if (scratches[i])
-//		{
-//			scratches[i]->Release();
-//		}
-//	}
-//	if (pScratchResource)
-//	{
-//		pScratchResource->Release();
-//	}
-//	if (pInstanceDescs)
-//	{
-//		pInstanceDescs->Release();
-//	}
-//
-//	return true;
 }
 
 bool Renderer::BuildShaderTables()
@@ -1490,7 +1514,7 @@ bool Renderer::AllocateUploadBuffer(void* pData, UINT64 dataSize, ID3D12Resource
 	HRESULT hr;
 
 	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(dataSize);
+	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ALIGN(dataSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 	hr = m_pDevice->CreateCommittedResource(&uploadHeapProperties,
 											D3D12_HEAP_FLAG_NONE,
 											&bufferDesc,
@@ -1540,7 +1564,7 @@ bool Renderer::AllocateUAVBuffer(UINT64 bufferSize, ID3D12Resource** ppOutResour
 	HRESULT hr;
 
 	CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
-	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(ALIGN(bufferSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	hr = m_pDevice->CreateCommittedResource(&uploadHeapProperties,
 											D3D12_HEAP_FLAG_NONE,
 											&bufferDesc,

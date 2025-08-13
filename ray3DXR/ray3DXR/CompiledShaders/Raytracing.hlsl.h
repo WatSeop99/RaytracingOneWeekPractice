@@ -2665,7 +2665,7 @@ attributes #2 = { nounwind readonly }
 !172 = !{!".\5CRandom.hlsl", !"// CODE FROM: \0D\0A// https://github.com/GPSnoopy/RayTracingInVulkan\0D\0A// Generates a seed for a random number generator from 2 inputs plus a backoff\0D\0A// https://github.com/nvpro-samples/optix_prime_baking/blob/332a886f1ac46c0b3eea9e89a59593470c755a0e/random.h\0D\0A// https://github.com/nvpro-samples/vk_raytracing_tutorial_KHR/tree/master/ray_tracing_jitter_cam\0D\0A// https://en.wikipedia.org/wiki/Tiny_Encryption_Algorithm\0D\0Auint InitRandomSeed(uint val0, uint val1)\0D\0A{\0D\0A    uint v0 = val0, v1 = val1, s0 = 0;\0D\0A    \0D\0A    [unroll]\0D\0A    for (uint n = 0; n < 16; n++)\0D\0A    {\0D\0A        s0 += 0x9e3779b9;\0D\0A        v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);\0D\0A        v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);\0D\0A    }\0D\0A\0D\0A    return v0;\0D\0A}\0D\0A\0D\0Auint RandomInt(inout uint seed)\0D\0A{\0D\0A\09// LCG values from Numerical Recipes\0D\0A    return (seed = 1664525 * seed + 1013904223);\0D\0A}\0D\0A\0D\0Afloat RandomFloat(inout uint seed)\0D\0A{\0D\0A\09//// Float version using bitmask from Numerical Recipes\0D\0A\09//const uint one = 0x3f800000;\0D\0A\09//const uint msk = 0x007fffff;\0D\0A\09//return uintBitsToFloat(one | (msk & (RandomInt(seed) >> 9))) - 1;\0D\0A\0D\0A\09// Faster version from NVIDIA examples; quality good enough for our use case.\0D\0A    return (float(RandomInt(seed) & 0x00FFFFFF) / float(0x01000000));\0D\0A}\0D\0A\0D\0Afloat3 SampleSquare(uint seed)\0D\0A{\0D\0A    // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.\0D\0A    return float3(RandomFloat(seed) - 0.5, RandomFloat(seed) - 0.5, 0);\0D\0A}\0D\0A\0D\0Afloat2 RandomInUnitDisk(inout uint seed)\0D\0A{\0D\0A    for (;;)\0D\0A    {\0D\0A        const float2 p = 2 * float2(RandomFloat(seed), RandomFloat(seed)) - 1;\0D\0A        if (dot(p, p) < 1)\0D\0A        {\0D\0A            return p;\0D\0A        }\0D\0A    }\0D\0A}\0D\0A\0D\0Afloat3 RandomInUnitSphere(inout uint seed)\0D\0A{\0D\0A    for (;;)\0D\0A    {\0D\0A        const float3 p = normalize(2 * float3(RandomFloat(seed), RandomFloat(seed), RandomFloat(seed)) - 1);\0D\0A        if (dot(p, p) < 1)\0D\0A        {\0D\0A            return p;\0D\0A        }\0D\0A    }\0D\0A}"}
 !173 = !{!".\5CRaytracingHlslCompat.h", !"//*********************************************************\0D\0A//\0D\0A// Copyright (c) Microsoft. All rights reserved.\0D\0A// This code is licensed under the MIT License (MIT).\0D\0A// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF\0D\0A// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY\0D\0A// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR\0D\0A// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.\0D\0A//\0D\0A//*********************************************************\0D\0A\0D\0A#ifndef RAYTRACINGHLSLCOMPAT_H\0D\0A#define RAYTRACINGHLSLCOMPAT_H\0D\0A\0D\0A#ifdef HLSL\0D\0A#include \22HlslCompat.h\22\0D\0A#else\0D\0Ausing namespace DirectX;\0D\0A\0D\0A// Shader will use byte encoding to access indices.\0D\0Atypedef UINT16 Index;\0D\0A#endif\0D\0A\0D\0Astruct FrameBuffer\0D\0A{\0D\0A\09XMMATRIX ProjectionToWorld;\0D\0A\09XMMATRIX ModelViewInverse;\0D\0A\09XMVECTOR CameraPosition;\0D\0A};\0D\0A\0D\0Astruct MeshBuffer\0D\0A{\0D\0A\09XMFLOAT4 Albedo;\0D\0A\09int MeshID;\0D\0A\09int MaterialID;\0D\0A\09int VerticesOffset;\0D\0A\09int IndicesOffset;\0D\0A};\0D\0A\0D\0Astruct Vertex\0D\0A{\0D\0A\09XMFLOAT3 Position;\0D\0A\09float pad1;\0D\0A\09XMFLOAT3 Normal;\0D\0A\09float pad2;\0D\0A};\0D\0A\0D\0A#endif // RAYTRACINGHLSLCOMPAT_H"}
 !174 = !{!"Raytracing.hlsl"}
-!175 = !{!"-E", !"lib.no::entry", !"-T", !"lib_6_3", !"/Fo", !"E:\5COWL_Git\5CRaytracingOneWeekPractice\5Cray3DXR\5Cx64\5CDebug\5CRaytracing.cso", !"/Od", !"/Zi", !"/Zpr", !"-Qembed_debug"}
+!175 = !{!"-E", !"lib.no::entry", !"-T", !"lib_6_3", !"/Fo", !"D:\5COWL_Git\5CRaytracingOneWeekPractice\5Cray3DXR\5Cx64\5CDebug\5CRaytracing.cso", !"/Od", !"/Zi", !"/Zpr", !"-Qembed_debug"}
 !176 = !{i32 1, i32 3}
 !177 = !{i32 1, i32 7}
 !178 = !{!"lib", i32 6, i32 3}
@@ -3368,8 +3368,8 @@ attributes #2 = { nounwind readonly }
 #endif
 
 const unsigned char g_pRaytracing[] = {
-  0x44, 0x58, 0x42, 0x43, 0x66, 0x14, 0x34, 0x79, 0x40, 0xb9, 0xd0, 0x88,
-  0xa9, 0x03, 0xbe, 0xe3, 0xcd, 0x9d, 0x55, 0xcf, 0x01, 0x00, 0x00, 0x00,
+  0x44, 0x58, 0x42, 0x43, 0x82, 0xde, 0x81, 0xc2, 0x54, 0x9f, 0x9d, 0xd2,
+  0xfe, 0x65, 0xf2, 0xf5, 0xc7, 0xe1, 0xcb, 0xf8, 0x01, 0x00, 0x00, 0x00,
   0xac, 0x2a, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x00, 0x00,
   0x4c, 0x00, 0x00, 0x00, 0xf8, 0x02, 0x00, 0x00, 0x7c, 0xef, 0x00, 0x00,
   0xb0, 0xff, 0x00, 0x00, 0xe4, 0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
@@ -4956,7 +4956,7 @@ const unsigned char g_pRaytracing[] = {
   0x76, 0x72, 0x27, 0x1b, 0x82, 0x80, 0x42, 0x4b, 0x11, 0x1b, 0xb6, 0x34,
   0x31, 0x17, 0xb7, 0x37, 0x1d, 0x9d, 0x32, 0x37, 0x3a, 0xb9, 0x3c, 0x0a,
   0x2d, 0x54, 0x3c, 0xd8, 0xd2, 0xc4, 0xbe, 0x6c, 0xbe, 0x66, 0x38, 0xbc,
-  0x18, 0xbd, 0xb1, 0x14, 0x8a, 0x74, 0xb8, 0x9e, 0xae, 0x98, 0xbe, 0x8e,
+  0x18, 0xbd, 0xb1, 0x14, 0x88, 0x74, 0xb8, 0x9e, 0xae, 0x98, 0xbe, 0x8e,
   0xd2, 0xe8, 0xb8, 0xa4, 0xc2, 0xf2, 0xe8, 0xe4, 0xc2, 0xc6, 0xd2, 0xdc,
   0xce, 0x9e, 0xdc, 0xca, 0xae, 0xca, 0xca, 0xd6, 0xa0, 0xe4, 0xc2, 0xc6,
   0xe8, 0xd2, 0xc6, 0xca, 0xb8, 0xe4, 0xc2, 0xf2, 0x66, 0x88, 0xb0, 0xa4,
