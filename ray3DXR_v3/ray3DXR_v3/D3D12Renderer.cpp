@@ -720,7 +720,7 @@ BOOL CD3D12Renderer::BeginCreateMesh(void* pMeshObjHandle, const BasicVertex* pV
 	BOOL bResult = pMeshObj->BeginCreateMesh(pVertexList, dwVertexCount, dwTriGroupCount);
 	return bResult;
 }
-BOOL CD3D12Renderer::InsertTriGroup(void* pMeshObjHandle, const WORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest)
+BOOL CD3D12Renderer::InsertTriGroup(void* pMeshObjHandle, const DWORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest)
 {
 	CBasicMeshObject* pMeshObj = (CBasicMeshObject*)pMeshObjHandle;
 	BOOL bResult = pMeshObj->InsertIndexedTriList(pIndexList, dwTriCount, wchDiffuseTexFileName, wchNormalTexFileName, mtlType, bUseAlphaTest);

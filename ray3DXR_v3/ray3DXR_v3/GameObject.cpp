@@ -252,7 +252,7 @@ void* CGameObject::CreateBoxMeshObject()
 {
 	// create box mesh
 	// create vertices and indices
-	WORD	pIndexList[36] = {};
+	DWORD	pIndexList[36] = {};
 	BasicVertex* pVertexList = nullptr;
 
 	float fScale = (float)((rand() % 4) + 1);
@@ -308,7 +308,7 @@ void* CGameObject::CreateGridBoxMeshObject()
 {
 	// create box mesh
 	// create vertices and indices
-	WORD* pIndexList = nullptr;
+	DWORD* pIndexList = nullptr;
 	DWORD dwIndexCount = 0;
 	BasicVertex* pVertexList = nullptr;
 
@@ -369,7 +369,7 @@ void* CGameObject::CreateBottomMeshObject()
 {
 	// create bottom mesh
 	// create vertices and indices
-	WORD	pIndexList[6] = {};
+	DWORD	pIndexList[6] = {};
 	BasicVertex pVertexList[4] = {};
 	
 	CreateBottomMesh(pVertexList, 4, pIndexList, 6, 20.0f, -1.0f);
@@ -394,7 +394,7 @@ void* CGameObject::CreateWaterMeshObject()
 {
 	// create bottom mesh
 	// create vertices and indices
-	WORD	pIndexList[6] = {};
+	DWORD	pIndexList[6] = {};
 	BasicVertex pVertexList[4] = {};
 	
 	CreateBottomMesh(pVertexList, 4, pIndexList, 6, 10.0f, 0.0f);
@@ -419,7 +419,7 @@ void* CGameObject::CreateWallMeshObject()
 {
 	// create bottom mesh
 	// create vertices and indices
-	WORD	pIndexList[6] = {};
+	DWORD	pIndexList[6] = {};
 	BasicVertex pVertexList[4] = {};
 	
 	CreateWallMesh(pVertexList, 4, pIndexList, 6, 10.0f, -1.0f);
@@ -454,7 +454,7 @@ void* CGameObject::CreateQuadMesh()
 		{ { -0.25f, -0.25f, 0.0f }, {0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f } },
 	};
 
-	WORD pIndexList[] =
+	DWORD pIndexList[] =
 	{
 		0, 1, 2,
 		0, 2, 3

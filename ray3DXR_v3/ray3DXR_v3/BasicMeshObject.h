@@ -73,7 +73,7 @@ public:
 	void	UpdateBLAS(ID3D12GraphicsCommandList6* pCommandList, D3D12_CPU_DESCRIPTOR_HANDLE uavVertexOutput, const XMMATRIX* pMatWorld, float fRadius);
 
 	BOOL	BeginCreateMesh(const BasicVertex* pVertexList, DWORD dwVertexNum, DWORD dwTriGroupCount);
-	BOOL	InsertIndexedTriList(const WORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest);
+	BOOL	InsertIndexedTriList(const DWORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest);
 	void	EndCreateMesh();
 
 	void*	CreateBLAS(BOOL bAllowUpdate);

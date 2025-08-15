@@ -11,7 +11,8 @@
 
 #define HitDistanceOnMiss 0
 
-static const uint g_IndexSizeInBytes = 2;
+//static const uint g_IndexSizeInBytes = 2;
+static const uint g_IndexSizeInBytes = 4;
 static const uint g_IndicesPerTriangle = 3;
 static const uint g_TriangleIndexStride = g_IndicesPerTriangle * g_IndexSizeInBytes;
 static const uint MAX_RT_LIGHT_COUNT = 8;

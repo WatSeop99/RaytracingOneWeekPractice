@@ -39,7 +39,7 @@ XMVECTOR ComputeTangent(const XMVECTOR& p0, const XMVECTOR& p1, const XMVECTOR& 
 	return XMVector3Normalize(tangent);
 }
 
-DWORD CreateGridPerPlane(BasicVertex* pOutVertexList, DWORD dwMaxVertexBufferCount, WORD* pOutIndexList, DWORD dwMaxIndexBufferCount, const XMFLOAT3* pStart, const XMFLOAT3* pEnd,
+DWORD CreateGridPerPlane(BasicVertex* pOutVertexList, DWORD dwMaxVertexBufferCount, DWORD* pOutIndexList, DWORD dwMaxIndexBufferCount, const XMFLOAT3* pStart, const XMFLOAT3* pEnd,
 						 DWORD dwStartVertexIndex,
 						 int iWidth, int iHeight,
 						 int u_index, int v_index,
@@ -95,7 +95,7 @@ DWORD CreateGridPerPlane(BasicVertex* pOutVertexList, DWORD dwMaxVertexBufferCou
 	{
 		for (int u = 0; u < iWidth; u++)
 		{
-			WORD* pDestIndex = pOutIndexList + ((u * 2 * 3) + v * iWidth * (2 * 3));
+			DWORD* pDestIndex = pOutIndexList + ((u * 2 * 3) + v * iWidth * (2 * 3));
 			pDestIndex[0] = u + (v * width_vertex_count);
 			pDestIndex[1] = (u + 1) + (v * width_vertex_count);
 			pDestIndex[2] = (u + 1) + ((v + 1) * width_vertex_count);
@@ -131,7 +131,7 @@ DWORD CreateGridPerPlane(BasicVertex* pOutVertexList, DWORD dwMaxVertexBufferCou
 	return dwVertexCount;
 }
 
-DWORD CreateGridBox(BasicVertex** ppOutVertexList, WORD** ppOutIndexList, DWORD* pdwOutIndexCount, int iWidth, int iHeight, float fHalfBoxLen)
+DWORD CreateGridBox(BasicVertex** ppOutVertexList, DWORD** ppOutIndexList, DWORD* pdwOutIndexCount, int iWidth, int iHeight, float fHalfBoxLen)
 {
 	DWORD dwVertexCount = 0;
 	DWORD dwIndexCount = 0;
@@ -193,8 +193,8 @@ DWORD CreateGridBox(BasicVertex** ppOutVertexList, WORD** ppOutIndexList, DWORD*
 
 	DWORD dwMaxIndexCountPerPlane = iWidth * iHeight * 2 * 3;
 	DWORD dwMaxIndexCount = dwMaxIndexCountPerPlane * 6;
-	WORD* pIndexList = new WORD[dwMaxIndexCount];
-	memset(pIndexList, 0, sizeof(WORD) * dwMaxIndexCount);
+	DWORD* pIndexList = new DWORD[dwMaxIndexCount];
+	memset(pIndexList, 0, sizeof(DWORD) * dwMaxIndexCount);
 	
 	// -z
 	DWORD dwIndexCountPerPlane = 0;
@@ -233,7 +233,7 @@ DWORD CreateGridBox(BasicVertex** ppOutVertexList, WORD** ppOutIndexList, DWORD*
 
 	return dwVertexCount;
 }
-void DeleteGridBox(BasicVertex** ppInOutVertexList, WORD** ppInOutIndexList)
+void DeleteGridBox(BasicVertex** ppInOutVertexList, DWORD** ppInOutIndexList)
 {
 	BasicVertex* pVertexList = *ppInOutVertexList;
 	if (pVertexList)
@@ -242,20 +242,20 @@ void DeleteGridBox(BasicVertex** ppInOutVertexList, WORD** ppInOutIndexList)
 		*ppInOutVertexList = nullptr;
 	}
 	
-	WORD* pIndexList = *ppInOutIndexList;
+	DWORD* pIndexList = *ppInOutIndexList;
 	if (pIndexList)
 	{
 		delete[] pIndexList;
 		*ppInOutIndexList = nullptr;
 	}
 }
-DWORD CreateBoxMesh(BasicVertex** ppOutVertexList, WORD* pOutIndexList, DWORD dwMaxBufferCount, float fHalfBoxLen)
+DWORD CreateBoxMesh(BasicVertex** ppOutVertexList, DWORD* pOutIndexList, DWORD dwMaxBufferCount, float fHalfBoxLen)
 {
 	const DWORD INDEX_COUNT = 36;
 	if (dwMaxBufferCount < INDEX_COUNT)
 		__debugbreak();
 
-	const WORD pIndexList[INDEX_COUNT] =
+	const DWORD pIndexList[INDEX_COUNT] =
 	{
 		// +z
 		3, 0, 1,
@@ -399,7 +399,7 @@ DWORD CreateBoxMesh(BasicVertex** ppOutVertexList, WORD* pOutIndexList, DWORD dw
 	return dwBasicVertexCount;
 }
 
-DWORD CreateBottomMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD* pOutIndexList, DWORD dwMaxIndexCount, float fHalfWidthDepth, float fHeight)
+DWORD CreateBottomMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, DWORD* pOutIndexList, DWORD dwMaxIndexCount, float fHalfWidthDepth, float fHeight)
 {
 	if (dwMaxVertexCount < 4)
 		__debugbreak();
@@ -413,7 +413,7 @@ DWORD CreateBottomMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD
 	// | 0   1
 	// | 3   2
 	// +------ x
-	const WORD pIndexList[6] =
+	const DWORD pIndexList[6] =
 	{
 		0, 1, 2,
 		0, 2, 3
@@ -452,12 +452,12 @@ DWORD CreateBottomMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD
 		
 		pOutVertexList[i] = v;
 	}
-	memcpy(pOutIndexList, pIndexList, sizeof(WORD) * 6);
+	memcpy(pOutIndexList, pIndexList, sizeof(DWORD) * 6);
 
 	return 4;
 }
 
-DWORD CreateWallMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD* pOutIndexList, DWORD dwMaxIndexCount, float fHalfWidthDepth, float fHeight)
+DWORD CreateWallMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, DWORD* pOutIndexList, DWORD dwMaxIndexCount, float fHalfWidthDepth, float fHeight)
 {
 	if (dwMaxVertexCount < 4)
 		__debugbreak();
@@ -471,7 +471,7 @@ DWORD CreateWallMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD* 
 	// | 0   1
 	// | 3   2
 	// +------ x
-	const WORD pIndexList[6] =
+	const DWORD pIndexList[6] =
 	{
 		0, 1, 2,
 		0, 2, 3
@@ -510,7 +510,7 @@ DWORD CreateWallMesh(BasicVertex* pOutVertexList, DWORD dwMaxVertexCount, WORD* 
 		
 		pOutVertexList[i] = v;
 	}
-	memcpy(pOutIndexList, pIndexList, sizeof(WORD) * 6);
+	memcpy(pOutIndexList, pIndexList, sizeof(DWORD) * 6);
 
 	return 4;
 }

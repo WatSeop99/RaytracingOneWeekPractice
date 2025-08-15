@@ -215,7 +215,7 @@ BOOL CBasicMeshObject::BeginCreateMesh(const BasicVertex* pVertexList, DWORD dwV
 lb_return:
 	return bResult;
 }
-BOOL CBasicMeshObject::InsertIndexedTriList(const WORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest)
+BOOL CBasicMeshObject::InsertIndexedTriList(const DWORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest)
 {
 	BOOL bResult = FALSE;
 
@@ -232,11 +232,11 @@ BOOL CBasicMeshObject::InsertIndexedTriList(const WORD* pIndexList, DWORD dwTriC
 		__debugbreak();
 		goto lb_return;
 	}
-	DWORD dwIndicesSize = dwTriCount * 3 * sizeof(WORD);
+	DWORD dwIndicesSize = dwTriCount * 3 * sizeof(DWORD);
 	DWORD dwAlignedIndicesSize = (dwIndicesSize / 16 + ((dwIndicesSize % 16) != 0)) * 16;
-	DWORD dwAlignedIndexNum = dwAlignedIndicesSize / sizeof(WORD);
+	DWORD dwAlignedIndexNum = dwAlignedIndicesSize / sizeof(DWORD);
 
-	if (FAILED(pResourceManager->CreateIndexBuffer(dwAlignedIndexNum, &IndexBufferView, &pIndexBuffer, (void*)pIndexList, sizeof(WORD) * dwTriCount * 3)))
+	if (FAILED(pResourceManager->CreateIndexBuffer(dwAlignedIndexNum, &IndexBufferView, &pIndexBuffer, (void*)pIndexList, sizeof(DWORD) * dwTriCount * 3)))
 	{
 		__debugbreak();
 		goto lb_return;

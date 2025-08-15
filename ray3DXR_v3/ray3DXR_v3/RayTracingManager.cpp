@@ -444,7 +444,7 @@ BLAS_INSTANCE* CRayTracingManager::AllocBLAS(ID3D12Resource* pVertexBuffer, UINT
 		pGeomDescList[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 		pGeomDescList[i].Triangles.IndexBuffer = IB_GPU_Ptr;
 		pGeomDescList[i].Triangles.IndexCount = pTriGroupInfoList[i].dwIndexNum;
-		pGeomDescList[i].Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+		pGeomDescList[i].Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 		pGeomDescList[i].Triangles.Transform3x4 = 0;
 		pGeomDescList[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 		pGeomDescList[i].Triangles.VertexCount = dwVertexCount;
@@ -492,7 +492,7 @@ BLAS_INSTANCE* CRayTracingManager::AllocBLAS(ID3D12Resource* pVertexBuffer, UINT
 
 			// Create ShaderResource from Index Buffer			
 			srvDesc.Buffer.FirstElement = 0;
-			srvDesc.Buffer.NumElements = (pTriGroupInfoList[i].dwIndexNum * 2) / 4;	// compute shader에서 4bytes 단위로 읽어야 하므로...
+			srvDesc.Buffer.NumElements = (pTriGroupInfoList[i].dwIndexNum * 4) / 4;	// compute shader에서 4bytes 단위로 읽어야 하므로...
 			srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 			srvDesc.Buffer.StructureByteStride = 0;

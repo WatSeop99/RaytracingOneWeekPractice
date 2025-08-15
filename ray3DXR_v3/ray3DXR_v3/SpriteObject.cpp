@@ -208,7 +208,7 @@ BOOL CSpriteObject::InitMesh()
 	};
 
 
-	WORD Indices[] =
+	DWORD Indices[] =
 	{
 		0, 1, 2,
 		0, 2, 3

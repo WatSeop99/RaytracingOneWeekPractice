@@ -120,7 +120,7 @@ public:
 	void	SetSkyCubeMap(void* pTexHandle);
 
 	BOOL	BeginCreateMesh(void* pMeshObjHandle, const BasicVertex* pVertexList, DWORD dwVertexCount, DWORD dwTriGroupCount);
-	BOOL	InsertTriGroup(void* pMeshObjHandle, const WORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest);
+	BOOL	InsertTriGroup(void* pMeshObjHandle, const DWORD* pIndexList, DWORD dwTriCount, const WCHAR* wchDiffuseTexFileName, const WCHAR* wchNormalTexFileName, MaterialType::Type mtlType, BOOL bUseAlphaTest);
 	void	EndCreateMesh(void* pMeshObjHandle);
 
 	void*	CreateTiledTexture(UINT TexWidth, UINT TexHeight, DWORD r, DWORD g, DWORD b);

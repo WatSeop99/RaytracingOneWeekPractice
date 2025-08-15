@@ -320,8 +320,7 @@ void MyClosestHitShader_RadianceRay(inout RadiancePayload rayPayload, in BuiltIn
     uint baseIndex = PrimitiveIndex() * g_TriangleIndexStride;
 
     // 삼각형의 세 점을 얻기 위해 세 점의 index를 구한다.
-	// Load up 3 16 bit indices for the triangle.
-    uint3 indices = Load3x16BitIndices(baseIndex);
+    uint3 indices = l_Indices.Load3(baseIndex);
     float2 CurTexCoord = 0;
     float4 CurColor = float4(0, 0, 0, 1);
     float4 texDiffuse = float4(0, 0, 0, 0);
@@ -411,7 +410,7 @@ void MyAnyHitShader_RadianceRay(inout RadiancePayload payload, in BuiltInTriangl
     uint baseIndex = PrimitiveIndex() * g_TriangleIndexStride;
     
 	// Load up 3 16 bit indices for the triangle.
-    uint3 indices = Load3x16BitIndices(baseIndex);
+    uint3 indices = l_Indices.Load3(baseIndex);
     float2 CurTexCoord = 0;
     float4 CurColor = float4(0, 0, 0, 1);
     float4 texDiffuse = float4(0, 0, 0, 0);
@@ -466,7 +465,7 @@ void MyAnyHitShader_ShadowRay(inout ShadowPayload rayPayload, in BuiltInTriangle
     uint baseIndex = PrimitiveIndex() * g_TriangleIndexStride;
 
 	// Load up 3 16 bit indices for the triangle.
-    uint3 indices = Load3x16BitIndices(baseIndex);
+    uint3 indices = l_Indices.Load3(baseIndex);
     float2 CurTexCoord = 0;
     float4 CurColor = float4(0, 0, 0, 1);
     float4 texDiffuse = float4(0, 0, 0, 0);
