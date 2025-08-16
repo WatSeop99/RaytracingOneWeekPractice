@@ -23,6 +23,7 @@ enum GAME_OBJECT_TYPE
 	GAME_OBJECT_TYPE_WATER,
 	GAME_OBJECT_TYPE_QUAD,
 	GAME_OBJECT_TYPE_BOTTOM,
+	GAME_OBJECT_TYPE_SPHERE,
 	GAME_OBJECT_TYPE_COUNT
 };
 
@@ -68,6 +69,7 @@ public:
 	void*	CreateBottomMeshObject();
 	void*	CreateWaterMeshObject();
 	void*	CreateWallMeshObject();
+	void*	CreateSphereMeshObject(float radius, UINT sliceCount, UINT stackCount, DirectX::XMFLOAT4* pColor, int materialID);
 	void	GetPosition(float* pfOutX, float* pfOutY, float* pfOutZ);
 	void	GetScale(float* pfOutX, float* pfOutY, float* pfOutZ);
 	float	GetRotationY();

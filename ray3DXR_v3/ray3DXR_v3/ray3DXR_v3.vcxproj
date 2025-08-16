@@ -169,6 +169,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="typedef.h" />
+    <ClInclude Include="Util.h" />
     <ClInclude Include="VertexUtil.h" />
     <ClInclude Include="WriteDebugString.h" />
   </ItemGroup>
@@ -198,6 +199,7 @@
     <ClCompile Include="SingleDescriptorAllocator.cpp" />
     <ClCompile Include="SpriteObject.cpp" />
     <ClCompile Include="TextureManager.cpp" />
+    <ClCompile Include="Util.cpp" />
     <ClCompile Include="VertexUtil.cpp" />
     <ClCompile Include="WriteDebugString.cpp" />
   </ItemGroup>

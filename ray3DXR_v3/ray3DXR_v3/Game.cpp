@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 #include "D3D12Renderer.h"
 #include "GameObject.h"
+#include "Util.h"
 #include "Game.h"
 
 CGame::CGame()
@@ -29,7 +30,7 @@ BOOL CGame::Initialize(HWND hWnd, BOOL bEnableDebugLayer, BOOL bEnableGBV, BOOL 
 
 	// Create Font
 	m_pFontObj = m_pRenderer->CreateFontObject(L"Tahoma", 18.0f);
-	
+
 	// create texture for draw text
 	m_TextImageWidth = 512;
 	m_TextImageHeight = 256;
@@ -38,30 +39,120 @@ BOOL CGame::Initialize(HWND hWnd, BOOL bEnableDebugLayer, BOOL bEnableGBV, BOOL 
 	memset(m_pTextImage, 0, m_TextImageWidth * m_TextImageHeight * 4);
 
 	m_pSpriteObjCommon = m_pRenderer->CreateSpriteObject();
-	
 
-	for (DWORD i = 0; i < BOX_OBJ_COUNT; i++)
+
+	//for (DWORD i = 0; i < BOX_OBJ_COUNT; i++)
+	//{
+	//	CGameObject* pGameObj = CreateGameObjectAsGridBox();
+	//	if (pGameObj)
+	//	{
+	//		float x = (float)((rand() % 41) - 20);	// -20m - 20m 
+	//		float y = 0.0f;
+	//		float z = (float)((rand() % 41) - 20);	// -20m - 20m 
+	//		pGameObj->SetPosition(x, y, z);
+	//		float rad = (rand() % 181) * (3.1415f / 180.0f);
+	//		pGameObj->SetRotationY(rad);
+	//	}
+	//}
+	//CGameObject* pBottom = CreateGameObjectAsBottom();
+	//CGameObject* pWall = CreateGameObjectAsWall();	
+
+	enum eColorType
 	{
-		CGameObject* pGameObj = CreateGameObjectAsGridBox();
-		if (pGameObj)
+		ColorType_Lambertian = 0,
+		ColorType_Metallic,
+		ColorType_Dielectric
+	};
+	const int SLICE_COUNT = 16;
+	const int STACK_COUNT = 32;
+
+	{
+		DirectX::XMFLOAT4 color(0.5f, 0.5f, 0.5f, 1.0f);
+		CGameObject* pSphere = CreateGameObjectAsSphere(1000.0f, SLICE_COUNT, 512, &color, (int)ColorType_Lambertian);
+		pSphere->SetPosition(0.0f, -1000.0f, 0.0f);
+	}
+	{
+		for (int a = -11; a < 11; ++a)
 		{
-			float x = (float)((rand() % 41) - 20);	// -20m - 20m 
-			float y = 0.0f;
-			float z = (float)((rand() % 41) - 20);	// -20m - 20m 
-			pGameObj->SetPosition(x, y, z);
-			float rad = (rand() % 181) * (3.1415f / 180.0f);
-			pGameObj->SetRotationY(rad);
+			for (int b = -11; b < 11; ++b)
+			{
+				double chooseMat = RandomDouble();
+				DirectX::XMVECTOR center = { (float)a + 0.9f * RandomFloat(), 0.2f, (float)b + 0.9f * RandomFloat() };
+				DirectX::XMVECTOR length = DirectX::XMVector3Length(DirectX::XMVectorSubtract(center, { 4.0f, 0.2f,0.0f }));
+
+				if (DirectX::XMVectorGetX(length) > 0.9f)
+				{
+					DirectX::XMVECTOR materialParameter;
+					int materialType = 0;
+
+					if (chooseMat < 0.8)
+					{
+						// diffuse
+						materialType = ColorType_Lambertian;
+
+						DirectX::XMVECTOR color1;
+						DirectX::XMVECTOR color2;
+						RandomColor(&color1);
+						RandomColor(&color2);
+						materialParameter = color1 * color2;
+					}
+					else if (chooseMat < 0.95)
+					{
+						// metal
+						materialType = ColorType_Metallic;
+
+						float fuzz = RandomFloat(0.0f, 0.5f);
+						materialParameter =
+						{
+							RandomFloat(0.5f, 1.0f),
+							RandomFloat(0.5f, 1.0f),
+							RandomFloat(0.5f, 1.0f),
+							fuzz
+						};
+					}
+					else
+					{
+						// glass
+						materialType = ColorType_Dielectric;
+						materialParameter = { 1.5f, 1.5f, 1.5f, 1.5f };
+					}
+
+					DirectX::XMFLOAT4 color;
+					DirectX::XMStoreFloat4(&color, materialParameter);
+					CGameObject* pSphere = CreateGameObjectAsSphere(0.2f, SLICE_COUNT, STACK_COUNT, &color, materialType);
+					
+					DirectX::XMFLOAT3 pos;
+					DirectX::XMStoreFloat3(&pos, center);
+					pSphere->SetPosition(pos.x, pos.y, pos.z);
+				}
+			}
 		}
 	}
-	CGameObject* pBottom = CreateGameObjectAsBottom();
-	CGameObject* pWall = CreateGameObjectAsWall();	
+	{
+		DirectX::XMFLOAT4 color;
+		CGameObject* pSphere1 = nullptr;
+		CGameObject* pSphere2 = nullptr;
+		CGameObject* pSphere3 = nullptr;
+
+		color = { 1.5f, 1.5f, 1.5f, 1.5f };
+		pSphere1 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Dielectric);
+		pSphere1->SetPosition(0.0f, 1.0f, 0.0f);
+
+		color = { 0.4f, 0.2f, 0.1f, 0.0f };
+		pSphere2 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Lambertian);
+		pSphere2->SetPosition(-4.0f, 1.0f, 0.0f);
+
+		color = { 0.7f, 0.6f, 0.5f, 0.0f };
+		pSphere3 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Metallic);
+		pSphere3->SetPosition(4.0f, 1.0f, 0.0f);
+	}
 
 	m_pSkyCubeTex = m_pRenderer->CreateTextureFromFile(L"skycube.dds");
 	if (m_pSkyCubeTex)
 	{
 		m_pRenderer->SetSkyCubeMap(m_pSkyCubeTex);
 	}
-	
+
 	return TRUE;
 }
 
@@ -92,7 +183,7 @@ CGameObject* CGame::CreateGameObjectAsGridBox()
 CGameObject* CGame::CreateGameObjectAsBottom()
 {
 	// meshobject를 공용으로 쓰도록 한다.
-	
+
 	CGameObject* pGameObj = new CGameObject;
 	pGameObj->Initialize(this, GAME_OBJECT_ACTION_TYPE_NONE);
 	pGameObj->CreateBottomMeshObject();
@@ -103,7 +194,7 @@ CGameObject* CGame::CreateGameObjectAsBottom()
 CGameObject* CGame::CreateGameObjectAsWater()
 {
 	// meshobject를 공용으로 쓰도록 한다.
-	
+
 	CGameObject* pGameObj = new CGameObject;
 	pGameObj->Initialize(this, GAME_OBJECT_ACTION_TYPE_NONE);
 	pGameObj->CreateWaterMeshObject();
@@ -114,10 +205,19 @@ CGameObject* CGame::CreateGameObjectAsWater()
 CGameObject* CGame::CreateGameObjectAsWall()
 {
 	// meshobject를 공용으로 쓰도록 한다.
-	
+
 	CGameObject* pGameObj = new CGameObject;
 	pGameObj->Initialize(this, GAME_OBJECT_ACTION_TYPE_NONE);
 	pGameObj->CreateWallMeshObject();
+	LinkToLinkedListFIFO(&m_pGameObjLinkHead, &m_pGameObjLinkTail, &pGameObj->m_LinkInGame);
+
+	return pGameObj;
+}
+CGameObject* CGame::CreateGameObjectAsSphere(float radius, UINT sliceCount, UINT stackCount, DirectX::XMFLOAT4* pColor, int materialID)
+{
+	CGameObject* pGameObj = new CGameObject;
+	pGameObj->Initialize(this, GAME_OBJECT_ACTION_TYPE_NONE);
+	pGameObj->CreateSphereMeshObject(radius, sliceCount, stackCount, pColor, materialID);
 	LinkToLinkedListFIFO(&m_pGameObjLinkHead, &m_pGameObjLinkTail, &pGameObj->m_LinkInGame);
 
 	return pGameObj;
@@ -127,84 +227,81 @@ void CGame::OnKeyDown(UINT nChar, UINT uiScanCode)
 {
 	switch (nChar)
 	{
-		case VK_SHIFT:
-			m_bShiftKeyDown = TRUE;
-			break;
-		case 'W':
-			if (m_bShiftKeyDown)
-			{
-				m_CamOffsetY = 0.05f;
-			}
-			else
-			{
-				m_CamOffsetZ = 0.05f;
-			}
-			break;
-		case 'S':
-			if (m_bShiftKeyDown)
-			{
-				m_CamOffsetY = -0.05f;
-			}
-			else
-			{
-				m_CamOffsetZ = -0.05f;
-			}
-			break;
-		case 'A':
-			m_CamOffsetX = -0.05f;
-			break;
-		case 'D':
-			m_CamOffsetX = 0.05f;
-			break;
-		case 'R':
-			{
-				BOOL bUseDXR = m_pRenderer->IsEnabledDXR();
-				bUseDXR = bUseDXR == 0;
-				m_pRenderer->EnableDXR(bUseDXR);
-			}
-			break;
-		case 'F':
-			{
-				if (!m_dwTicksPerFrame)
-					m_dwTicksPerFrame = 16;
-				else
-					m_dwTicksPerFrame = 0;
-			}
-			break;
+	case VK_SHIFT:
+		m_bShiftKeyDown = TRUE;
+		break;
+	case 'W':
+		if (m_bShiftKeyDown)
+		{
+			m_CamOffsetY = 0.05f;
+		}
+		else
+		{
+			m_CamOffsetZ = 0.05f;
+		}
+		break;
+	case 'S':
+		if (m_bShiftKeyDown)
+		{
+			m_CamOffsetY = -0.05f;
+		}
+		else
+		{
+			m_CamOffsetZ = -0.05f;
+		}
+		break;
+	case 'A':
+		m_CamOffsetX = -0.05f;
+		break;
+	case 'D':
+		m_CamOffsetX = 0.05f;
+		break;
+	case 'R':
+	{
+		BOOL bUseDXR = m_pRenderer->IsEnabledDXR();
+		bUseDXR = bUseDXR == 0;
+		m_pRenderer->EnableDXR(bUseDXR);
+	}
+	break;
+	case 'F':
+	{
+		if (!m_dwTicksPerFrame)
+			m_dwTicksPerFrame = 16;
+		else
+			m_dwTicksPerFrame = 0;
+	}
+	break;
 	}
 }
 void CGame::OnKeyUp(UINT nChar, UINT uiScanCode)
 {
 	switch (nChar)
 	{
-		case VK_SHIFT:
-			m_bShiftKeyDown = FALSE;
-			break;
-		case 'W':
-			m_CamOffsetY = 0.0f;
-			m_CamOffsetZ = 0.0f;
-			break;
-		case 'S':
-			m_CamOffsetY = 0.0f;
-			m_CamOffsetZ = 0.0f;
-			break;
-		case 'A':
-			m_CamOffsetX = 0.0f;
-			break;
-		case 'D':
-			m_CamOffsetX = 0.0f;
-			break;
+	case VK_SHIFT:
+		m_bShiftKeyDown = FALSE;
+		break;
+	case 'W':
+		m_CamOffsetY = 0.0f;
+		m_CamOffsetZ = 0.0f;
+		break;
+	case 'S':
+		m_CamOffsetY = 0.0f;
+		m_CamOffsetZ = 0.0f;
+		break;
+	case 'A':
+		m_CamOffsetX = 0.0f;
+		break;
+	case 'D':
+		m_CamOffsetX = 0.0f;
+		break;
 	}
 }
 void CGame::OnMouseLButtonDown(int x, int y, UINT nFlags)
 {
-	
 	m_bMouseLButtonDown = TRUE;
-	
 }
 void CGame::OnMouseLButtonUp(int x, int y, UINT nFlags)
 {
-	
 	m_bMouseLButtonDown = FALSE;
 }
 void CGame::OnMouseRButtonDown(int x, int y, UINT nFlags)
@@ -218,7 +315,7 @@ void CGame::OnMouseRButtonDown(int x, int y, UINT nFlags)
 void CGame::OnMouseRButtonUp(int x, int y, UINT nFlags)
 {
 	m_bCamRotMode = FALSE;
-	m_bMouseRButtonDown = FALSE;	
+	m_bMouseRButtonDown = FALSE;
 }
 void CGame::OnMouseMButtonDown(int x, int y, UINT nFlags)
 {
@@ -249,11 +346,9 @@ void CGame::OnMouseMove(int x, int y, UINT nFlags)
 	m_iCurMouseY = y;
 }
 void CGame::OnMouseWheel(int x, int y, int iWheel)
-{
-}
+{}
 void CGame::OnMouseHWheel(int x, int y, int iWheel)
-{
-}
+{}
 void CGame::Run()
 {
 	m_FrameCount++;
@@ -268,18 +363,18 @@ void CGame::Run()
 
 	if (CurTick - m_PrvFrameCheckTick > 1000)
 	{
-		m_PrvFrameCheckTick = CurTick;	
-				
+		m_PrvFrameCheckTick = CurTick;
+
 		WCHAR wchTxt[64];
 		m_FPS = m_FrameCount;
 		swprintf_s(wchTxt, L"FPS:%u", m_FPS);
 		SetWindowText(m_hWnd, wchTxt);
-				
+
 		m_FrameCount = 0;
 	}
 }
 BOOL CGame::Update(ULONGLONG CurTick)
-{	
+{
 	// Update Scene with 60FPS
 	if ((DWORD)(CurTick - m_PrvUpdateTick) < m_dwTicksPerFrame)
 	{
@@ -292,7 +387,7 @@ BOOL CGame::Update(ULONGLONG CurTick)
 	{
 		m_pRenderer->MoveCamera(m_CamOffsetX, m_CamOffsetY, m_CamOffsetZ);
 	}
-	
+
 	// update game objects
 	SORT_LINK* pCur = m_pGameObjLinkHead;
 	while (pCur)
@@ -301,7 +396,7 @@ BOOL CGame::Update(ULONGLONG CurTick)
 		pGameObj->Run(m_FrameCount);
 		pCur = pCur->pNext;
 	}
-	
+
 	// update status text
 	int iTextWidth = 0;
 	int iTextHeight = 0;
@@ -336,7 +431,7 @@ void CGame::Render()
 		pGameObj->Render();
 		pCur = pCur->pNext;
 		dwObjCount++;
-	}	
+	}
 	// render dynamic texture as text
 	m_pRenderer->RenderSpriteWithTex(m_pSpriteObjCommon, 512 + 5, 256 + 5 + 256 + 5, 1.0f, 1.0f, nullptr, 0.0f, m_pTextTexTexHandle);
 
@@ -389,7 +484,7 @@ void CGame::Cleanup()
 			m_pRenderer->DeleteFontObject(m_pFontObj);
 			m_pFontObj = nullptr;
 		}
-	
+
 		if (m_pTextTexTexHandle)
 		{
 			m_pRenderer->DeleteTexture(m_pTextTexTexHandle);

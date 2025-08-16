@@ -23,6 +23,9 @@ BOOL CTextureManager::Initialize(CD3D12Renderer* pRenderer, DWORD dwMaxBucketNum
 }
 TEXTURE_HANDLE* CTextureManager::CreateTextureFromFile(const WCHAR* wchFileName)
 {
+	_ASSERT(wchFileName);
+	_ASSERT(wcslen(wchFileName) > 0);
+
 	ID3D12Device* pD3DDevice = m_pRenderer->INL_GetD3DDevice();
 	CSingleDescriptorAllocator* pSingleDescriptorAllocator = m_pRenderer->INL_GetSingleDescriptorAllocator();
 	

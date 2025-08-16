@@ -51,6 +51,7 @@ class CGame
 	CGameObject* CreateGameObjectAsBottom();
 	CGameObject* CreateGameObjectAsWater();
 	CGameObject* CreateGameObjectAsWall();
+	CGameObject* CreateGameObjectAsSphere(float radius, UINT sliceCount, UINT stackCount, DirectX::XMFLOAT4* pColor, int materialID);
 	void	DeleteGameObject(CGameObject* pGameObj);
 	void	DeleteAllGameObjects();
 

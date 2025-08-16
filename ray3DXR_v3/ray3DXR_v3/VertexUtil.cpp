@@ -249,6 +249,131 @@ void DeleteGridBox(BasicVertex** ppInOutVertexList, DWORD** ppInOutIndexList)
 		*ppInOutIndexList = nullptr;
 	}
 }
+void CreateSphereMesh(float radius, UINT sliceCount, UINT stackCount, BasicVertex** ppOutVertexList, UINT* pVertexCount, DWORD** ppOutIndexList, UINT* pIndexCount, DirectX::XMFLOAT4* pColor, int materialID)
+{
+	_ASSERT(radius != 0.0f);
+	_ASSERT(sliceCount != 0);
+	_ASSERT(stackCount != 0);
+	_ASSERT(ppOutVertexList && pVertexCount);
+	_ASSERT(ppOutIndexList && pIndexCount);
+	_ASSERT(pColor);
+	_ASSERT(materialID >= 0);
+
+	BasicVertex* pVertexList = nullptr;
+	DWORD* pIndexList = nullptr;
+	if (pVertexList || pIndexList)
+	{
+		__debugbreak();
+	}
+
+	const SIZE_T VERT_ARRAY_SIZE = 2 + ((stackCount - 1 - 1 + 1) * (sliceCount + 1));
+	const SIZE_T IND_ARRAY_SIZE = (sliceCount + 1) * 3 + ((stackCount - 2) * sliceCount) * 6 + sliceCount * 3;
+
+	pVertexList = new BasicVertex[VERT_ARRAY_SIZE];
+	pIndexList = new DWORD[IND_ARRAY_SIZE];
+	SIZE_T vertexCount = 0;
+	SIZE_T indexCount = 0;
+
+	BasicVertex vertexTemplate =
+	{
+		{ 0.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f },
+		{ (float)materialID, 0.0f, 0.0f },
+		*pColor,
+		{ 0.0f, 0.0f }
+	};
+	BasicVertex topVertex = vertexTemplate;
+	topVertex.position = { 0.0f, radius, 0.0f };
+	topVertex.normal = { 0.0f, 1.0f, 0.0f };
+	pVertexList[vertexCount++] = topVertex;
+
+	float phiStep = DirectX::XM_PI / stackCount;
+	float thetaStep = 2.0f * DirectX::XM_PI / sliceCount;
+	for (UINT i = 1; i <= stackCount - 1; ++i)
+	{
+		float phi = i * phiStep;
+		for (UINT j = 0; j <= sliceCount; ++j)
+		{
+			float theta = j * thetaStep;
+
+			BasicVertex v = vertexTemplate;
+			v.position =
+			{
+				radius * sinf(phi) * cosf(theta),
+				radius * cosf(phi),
+				radius * sinf(phi) * sinf(theta)
+			};
+
+			DirectX::XMVECTOR p = DirectX::XMLoadFloat3(&v.position);
+			DirectX::XMStoreFloat3(&v.normal, DirectX::XMVector3Normalize(p));
+
+			pVertexList[vertexCount++] = v;
+		}
+	}
+
+	BasicVertex bottomVertex = vertexTemplate;
+	bottomVertex.position = { 0.0f, -radius, 0.0f };
+	bottomVertex.normal = { 0.0f, -1.0f, 0.0f };
+	pVertexList[vertexCount++] = bottomVertex;
+
+	_ASSERT(vertexCount == VERT_ARRAY_SIZE);
+
+
+	for (UINT i = 0; i <= sliceCount; ++i)
+	{
+		pIndexList[indexCount++] = 0;
+		pIndexList[indexCount++] = i + 1;
+		pIndexList[indexCount++] = i;
+	}
+
+	UINT baseIndex = 1;
+	UINT ringVertexCount = sliceCount + 1;
+	for (UINT i = 0; i < stackCount - 2; ++i)
+	{
+		for (UINT j = 0; j < sliceCount; ++j)
+		{
+			pIndexList[indexCount++] = baseIndex + i * ringVertexCount + j;
+			pIndexList[indexCount++] = baseIndex + i * ringVertexCount + j + 1;
+			pIndexList[indexCount++] = baseIndex + (i + 1) * ringVertexCount + j;
+
+			pIndexList[indexCount++] = baseIndex + (i + 1) * ringVertexCount + j;
+			pIndexList[indexCount++] = baseIndex + i * ringVertexCount + j + 1;
+			pIndexList[indexCount++] = baseIndex + (i + 1) * ringVertexCount + j + 1;
+		}
+	}
+
+	UINT southPoleIndex = (UINT)vertexCount - 1;
+	baseIndex = southPoleIndex - ringVertexCount;
+	for (UINT i = 0; i < sliceCount; ++i)
+	{
+		pIndexList[indexCount++] = southPoleIndex;
+		pIndexList[indexCount++] = baseIndex + i;
+		pIndexList[indexCount++] = baseIndex + i + 1;
+	}
+
+	_ASSERT(indexCount == IND_ARRAY_SIZE);
+
+	*ppOutVertexList = pVertexList;
+	*ppOutIndexList = pIndexList;
+	*pVertexCount = vertexCount;
+	*pIndexCount = indexCount;
+}
+void DeleteSphereMesh(BasicVertex** ppOutVertexLis, DWORD** ppOutIndexList)
+{
+	BasicVertex* pVertexList = *ppOutVertexLis;
+	if (pVertexList)
+	{
+		delete[] pVertexList;
+		*ppOutVertexLis = nullptr;
+	}
+
+	DWORD* pIndexList = *ppOutIndexList;
+	if (pIndexList)
+	{
+		delete[] pIndexList;
+		*ppOutIndexList = nullptr;
+	}
+}
 DWORD CreateBoxMesh(BasicVertex** ppOutVertexList, DWORD* pOutIndexList, DWORD dwMaxBufferCount, float fHalfBoxLen)
 {
 	const DWORD INDEX_COUNT = 36;

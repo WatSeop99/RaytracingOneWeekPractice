@@ -440,6 +440,40 @@ void* CGameObject::CreateWallMeshObject()
 	m_ObjectType = GAME_OBJECT_TYPE_WALL;
 	return m_pMeshObj;
 }
+void* CGameObject::CreateSphereMeshObject(float radius, UINT sliceCount, UINT stackCount, DirectX::XMFLOAT4* pColor, int materialID)
+{
+	DWORD* pIndexList = nullptr;
+	BasicVertex* pVertexList = nullptr;
+	UINT vertexCount = 0;
+	UINT indexCount = 0;
+
+	// color, material 설정.
+	// tangent 부분 어짜피 안쓰니 저길 이용할거임.
+	// tangent x 부분에 material id 설정.
+	// material 타입에 따라 color에 albedo 값 기입.
+	// transform은 외부에서 설정.
+	CreateSphereMesh(radius, sliceCount, stackCount, &pVertexList, &vertexCount, &pIndexList, &indexCount, pColor, materialID);
+
+	m_pMeshObj = m_pRenderer->CreateBasicMeshObject();
+
+	// indexCount = 49059 ...
+	_ASSERT(pVertexList);
+	_ASSERT(pIndexList);
+	//m_pRenderer->BeginCreateMesh(m_pMeshObj, pVertexList, vertexCount, indexCount / 3);
+	m_pRenderer->BeginCreateMesh(m_pMeshObj, pVertexList, vertexCount, 1);
+	m_pRenderer->InsertTriGroup(m_pMeshObj, pIndexList, indexCount / 3, nullptr, nullptr, MaterialType::Type::Default, FALSE);
+	m_pRenderer->EndCreateMesh(m_pMeshObj);
+
+	if (m_pMeshObj)
+	{
+		m_pBlasHandle = m_pRenderer->CreateBLAS(m_pMeshObj, FALSE);
+	}
+	m_ObjectType = GAME_OBJECT_TYPE_SPHERE;
+
+	DeleteSphereMesh(&pVertexList, &pIndexList);
+
+	return m_pMeshObj;
+}
 void* CGameObject::CreateQuadMesh()
 {
 	m_pMeshObj = m_pRenderer->CreateBasicMeshObject();

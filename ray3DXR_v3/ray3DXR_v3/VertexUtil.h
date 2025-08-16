@@ -16,3 +16,6 @@ DWORD CreateGridPerPlane(BasicVertex* pOutVertexList, DWORD dwMaxVertexBufferCou
 
 DWORD CreateGridBox(BasicVertex** ppOutVertexList, DWORD** ppOutIndexList, DWORD* pdwOutIndexCount, int iWidth, int iHeight, float fHalfBoxLen);
 void DeleteGridBox(BasicVertex** ppInOutVertexList, DWORD** ppInOutIndexList);
+
+void CreateSphereMesh(float radius, UINT sliceCount, UINT stackCount, BasicVertex** ppOutVertexList, UINT* pVertexCount, DWORD** ppOutIndexList, UINT* pIndexCount, DirectX::XMFLOAT4* pColor, int materialID);
+void DeleteSphereMesh(BasicVertex** ppOutVertexLis, DWORD** ppOutIndexList);

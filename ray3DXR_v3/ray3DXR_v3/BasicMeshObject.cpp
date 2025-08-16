@@ -246,8 +246,12 @@ BOOL CBasicMeshObject::InsertIndexedTriList(const DWORD* pIndexList, DWORD dwTri
 	pTriGroup->IndexBufferView = IndexBufferView;
 	pTriGroup->dwTriCount = dwTriCount;
 	pTriGroup->dwAlignedIndexCount = dwAlignedIndexNum;
-	pTriGroup->pDiffuseTexHandle = (TEXTURE_HANDLE*)m_pRenderer->CreateTextureFromFile(wchDiffuseTexFileName);
-	
+
+	if (wchDiffuseTexFileName)
+	{
+		pTriGroup->pDiffuseTexHandle = (TEXTURE_HANDLE*)m_pRenderer->CreateTextureFromFile(wchDiffuseTexFileName);
+	}
+
 	pTriGroup->bUseAlphaTest = bUseAlphaTest;
 
 	FillBasicMaterial(&pTriGroup->mtl, mtlType);

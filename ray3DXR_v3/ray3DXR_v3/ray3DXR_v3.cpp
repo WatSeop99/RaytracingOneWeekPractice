@@ -4,6 +4,7 @@
 #include "pch.h"
 #include <Windows.h>
 #include <windowsx.h>
+#include <time.h>
 #include "Resource.h"
 #include <DirectXMath.h>
 #include "D3D12Renderer.h"
@@ -82,6 +83,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
+
+	srand((UINT)time(nullptr));
 
     // TODO: Place code here.
 
