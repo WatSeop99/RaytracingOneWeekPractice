@@ -72,6 +72,24 @@ BOOL CGame::Initialize(HWND hWnd, BOOL bEnableDebugLayer, BOOL bEnableGBV, BOOL 
 		pSphere->SetPosition(0.0f, -1000.0f, 0.0f);
 	}
 	{
+		DirectX::XMFLOAT4 color;
+		CGameObject* pSphere1 = nullptr;
+		CGameObject* pSphere2 = nullptr;
+		CGameObject* pSphere3 = nullptr;
+
+		color = { 1.5f, 1.5f, 1.5f, 1.5f };
+		pSphere1 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Dielectric);
+		pSphere1->SetPosition(0.0f, 1.0f, 0.0f);
+
+		color = { 0.4f, 0.2f, 0.1f, 0.0f };
+		pSphere2 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Lambertian);
+		pSphere2->SetPosition(-4.0f, 1.0f, 0.0f);
+
+		color = { 0.7f, 0.6f, 0.5f, 0.0f };
+		pSphere3 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Metallic);
+		pSphere3->SetPosition(4.0f, 1.0f, 0.0f);
+	}
+	{
 		for (int a = -11; a < 11; ++a)
 		{
 			for (int b = -11; b < 11; ++b)
@@ -127,24 +145,6 @@ BOOL CGame::Initialize(HWND hWnd, BOOL bEnableDebugLayer, BOOL bEnableGBV, BOOL 
 				}
 			}
 		}
-	}
-	{
-		DirectX::XMFLOAT4 color;
-		CGameObject* pSphere1 = nullptr;
-		CGameObject* pSphere2 = nullptr;
-		CGameObject* pSphere3 = nullptr;
-
-		color = { 1.5f, 1.5f, 1.5f, 1.5f };
-		pSphere1 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Dielectric);
-		pSphere1->SetPosition(0.0f, 1.0f, 0.0f);
-
-		color = { 0.4f, 0.2f, 0.1f, 0.0f };
-		pSphere2 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Lambertian);
-		pSphere2->SetPosition(-4.0f, 1.0f, 0.0f);
-
-		color = { 0.7f, 0.6f, 0.5f, 0.0f };
-		pSphere3 = CreateGameObjectAsSphere(1.0f, SLICE_COUNT, STACK_COUNT, &color, ColorType_Metallic);
-		pSphere3->SetPosition(4.0f, 1.0f, 0.0f);
 	}
 
 	m_pSkyCubeTex = m_pRenderer->CreateTextureFromFile(L"skycube.dds");
